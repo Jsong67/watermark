@@ -1,7 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <!-- 保持原有的 head 内容，添加移动端位置选择的样式 -->
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Batch Image Watermark Tool</title>
@@ -32,27 +31,12 @@
 </head>
 <body class="bg-gray-50">
     <div class="max-w-3xl mx-auto p-4 space-y-4">
-        <!-- 原有的所有控件保持不变 -->
         <div class="space-y-2">
             <label class="block text-sm font-medium text-gray-700">Upload Images</label>
             <input type="file" accept="image/*" id="imageInput" multiple
                 class="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100">
         </div>
 
-        <!-- 添加移动端水印位置选择器（默认隐藏） -->
-        <div id="mobilePositionSelector" class="space-y-2 hidden">
-            <label class="block text-sm font-medium text-gray-700">Watermark Position</label>
-            <select id="watermarkPosition" 
-                class="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm p-2">
-                <option value="top-left">Top Left</option>
-                <option value="top-right">Top Right</option>
-                <option value="center" selected>Center</option>
-                <option value="bottom-left">Bottom Left</option>
-                <option value="bottom-right">Bottom Right</option>
-            </select>
-        </div>
-
-        <!-- 保持原有的所有其他控件 -->
         <div class="grid grid-cols-2 gap-4">
             <div class="space-y-2">
                 <label class="block text-sm font-medium text-gray-700">Watermark Text</label>
@@ -70,6 +54,19 @@
                     <option value="Lora">Lora</option>
                 </select>
             </div>
+        </div>
+
+        <!-- 移动端水印位置选择器 -->
+        <div id="mobilePositionSelector" class="space-y-2 hidden">
+            <label class="block text-sm font-medium text-gray-700">Watermark Position</label>
+            <select id="watermarkPosition" 
+                class="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm p-2">
+                <option value="top-left">Top Left</option>
+                <option value="top-right">Top Right</option>
+                <option value="center" selected>Center</option>
+                <option value="bottom-left">Bottom Left</option>
+                <option value="bottom-right">Bottom Right</option>
+            </select>
         </div>
 
         <div class="grid grid-cols-2 gap-4">
@@ -100,7 +97,7 @@
         </div>
 
         <div id="previewArea" class="hidden space-y-4">
-            <h3 class="font-medium text-lg">Preview</h3>
+            <h3 class="font-medium text-lg" id="previewTitle">Preview (Drag watermark to adjust position)</h3>
             <div id="imagePreview" class="grid grid-cols-2 gap-4"></div>
             <button id="downloadAll" class="w-full bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700">
                 Download All Images
@@ -135,8 +132,144 @@
             fontSizeValue: document.getElementById('fontSizeValue'),
             opacityValue: document.getElementById('opacityValue'),
             mobilePositionSelector: document.getElementById('mobilePositionSelector'),
-            watermarkPosition: document.getElementById('watermarkPosition')
+            watermarkPosition: document.getElementById('watermarkPosition'),
+            previewTitle: document.getElementById('previewTitle')
         };
+
+        function loadImage(file) {
+            return new Promise((resolve) => {
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    const img = new Image();
+                    img.onload = () => resolve(img);
+                    img.src = e.target.result;
+                };
+                reader.readAsDataURL(file);
+            });
+        }
+
+        function getTextMetrics(ctx, text) {
+            const metrics = ctx.measureText(text);
+            const height = metrics.actualBoundingBoxAscent + metrics.actualBoundingBoxDescent;
+            return {
+                width: metrics.width,
+                height: height
+            };
+        }
+
+        function createWatermarkedCanvas(img) {
+            const canvas = document.createElement('canvas');
+            const ctx = canvas.getContext('2d');
+            
+            canvas.width = img.width;
+            canvas.height = img.height;
+            
+            ctx.drawImage(img, 0, 0);
+            
+            const opacity = parseInt(elements.opacity.value) / 100;
+            ctx.fillStyle = `rgba(255, 255, 255, ${opacity})`;
+            const weight = document.querySelector('input[name="fontWeight"]:checked').value;
+            
+            const fontSizePercent = parseFloat(elements.fontSize.value);
+            const fontSize = Math.round((fontSizePercent / 100) * canvas.height);
+            
+            ctx.font = `${weight} ${fontSize}px "${elements.fontFamily.value}"`;
+            
+            const text = elements.watermarkText.value;
+            const metrics = getTextMetrics(ctx, text);
+            
+            let x = state.watermarkPos.x * canvas.width;
+            let y = state.watermarkPos.y * canvas.height;
+            
+            const centerX = canvas.width / 2;
+            const centerY = canvas.height / 2;
+            
+            if (Math.abs(x - centerX) < canvas.width * 0.1 && Math.abs(y - centerY) < canvas.height * 0.1) {
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                x = centerX;
+                y = centerY;
+            } else {
+                const isLeft = x < centerX;
+                const isTop = y < centerY;
+                
+                ctx.textAlign = isLeft ? 'left' : 'right';
+                ctx.textBaseline = isTop ? 'top' : 'bottom';
+            }
+            
+            ctx.fillText(text, x, y);
+            
+            return canvas;
+        }
+
+        function createPreviewElement(img, index) {
+            const wrapper = document.createElement('div');
+            wrapper.className = 'canvas-wrapper';
+            
+            const canvas = createWatermarkedCanvas(img);
+            canvas.className = 'w-full h-auto border rounded';
+            canvas.dataset.index = index;
+            
+            wrapper.appendChild(canvas);
+
+            if (!state.isMobile) {
+                const overlay = document.createElement('div');
+                overlay.className = 'drag-overlay';
+                overlay.dataset.index = index;
+                wrapper.appendChild(overlay);
+            }
+            
+            return wrapper;
+        }
+
+        function updateAllPreviews() {
+            elements.imagePreview.innerHTML = '';
+            state.images.forEach((img, i) => {
+                elements.imagePreview.appendChild(createPreviewElement(img, i));
+            });
+        }
+
+        function handleDragStart(e) {
+            if (!e.target.classList.contains('drag-overlay')) return;
+            
+            const overlay = e.target;
+            const canvas = overlay.previousElementSibling;
+            
+            state.isDragging = true;
+            state.currentCanvas = canvas;
+            overlay.classList.add('dragging');
+            
+            const rect = canvas.getBoundingClientRect();
+            state.dragStartPos = { rect };
+        }
+
+        function handleDrag(e) {
+            if (!state.isDragging || !state.currentCanvas) return;
+            
+            const rect = state.dragStartPos.rect;
+            
+            let newX = (e.clientX - rect.left) / rect.width;
+            let newY = (e.clientY - rect.top) / rect.height;
+            
+            newX = Math.max(0, Math.min(1, newX));
+            newY = Math.max(0, Math.min(1, newY));
+            
+            state.watermarkPos = { x: newX, y: newY };
+            
+            updateAllPreviews();
+        }
+
+        function handleDragEnd() {
+            if (!state.isDragging) return;
+            
+            state.isDragging = false;
+            state.currentCanvas = null;
+            state.dragStartPos = null;
+            
+            document.querySelectorAll('.drag-overlay').forEach(overlay => {
+                overlay.classList.remove('dragging');
+            });
+        }
 
         // 位置映射函数
         function getPositionFromSelection(position) {
@@ -153,8 +286,8 @@
         // 初始化界面
         function initializeInterface() {
             if (state.isMobile) {
-                // 移动端显示位置选择器
                 elements.mobilePositionSelector.classList.remove('hidden');
+                elements.previewTitle.textContent = 'Preview';
                 
                 // 添加位置选择事件监听器
                 elements.watermarkPosition.addEventListener('change', (e) => {
@@ -163,32 +296,57 @@
                     updateAllPreviews();
                 });
             } else {
-                // 桌面端添加拖动事件监听器
+                elements.mobilePositionSelector.classList.add('hidden');
                 elements.imagePreview.addEventListener('mousedown', handleDragStart);
                 document.addEventListener('mousemove', handleDrag);
                 document.addEventListener('mouseup', handleDragEnd);
             }
         }
 
-        // 保持原有的所有其他函数...
-        // [这里包含原有代码中的所有其他函数，保持不变]
-
-        // 修改图片上传事件监听器
+        // 事件监听器
         elements.imageInput.addEventListener('change', async (e) => {
             state.images = await Promise.all(Array.from(e.target.files).map(loadImage));
             elements.previewArea.classList.remove('hidden');
             if (state.isMobile) {
-                // 移动端默认设置中心位置
                 elements.watermarkPosition.value = 'center';
                 state.watermarkPos = getPositionFromSelection('center');
             }
             updateAllPreviews();
         });
 
-        // 在页面加载时初始化界面
-        document.addEventListener('DOMContentLoaded', initializeInterface);
+        [elements.watermarkText, elements.fontFamily, elements.fontSize, elements.opacity]
+            .forEach(el => el.addEventListener('input', () => {
+                if (el === elements.fontSize) {
+                    elements.fontSizeValue.textContent = el.value;
+                } else if (el === elements.opacity) {
+                    elements.opacityValue.textContent = el.value;
+                }
+                updateAllPreviews();
+            }));
+        
+        document.querySelectorAll('input[name="fontWeight"]')
+            .forEach(el => el.addEventListener('change', updateAllPreviews));
 
-        // 保持原有的其他所有事件监听器...
+        elements.downloadAll.addEventListener('click', () => {
+            const zip = new JSZip();
+            
+            state.images.forEach((img, i) => {
+                const canvas = createWatermarkedCanvas(img);
+                const dataUrl = canvas.toDataURL('image/png');
+                const base64Data = dataUrl.split(',')[1];
+                zip.file(`watermarked-${i + 1}.png`, base64Data, {base64: true});
+            });
+            
+            zip.generateAsync({type: 'blob'}).then(blob => {
+                const link = document.createElement('a');
+                link.href = URL.createObjectURL(blob);
+                link.download = 'watermarked-images.zip';
+                link.click();
+            });
+        });
+
+        // 初始化界面
+        document.addEventListener('DOMContentLoaded', initializeInterface);
     </script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 </body>
