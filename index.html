@@ -54,8 +54,10 @@
 
         <div class="grid grid-cols-2 gap-4">
             <div class="space-y-2">
-                <label class="block text-sm font-medium text-gray-700">Font Size: <span id="fontSizeValue">48</span>px</label>
-                <input type="range" id="fontSize" min="12" max="120" value="48" class="block w-full">
+                <label class="block text-sm font-medium text-gray-700">
+                    Font Size: <span id="fontSizeValue">5</span>% of image height
+                </label>
+                <input type="range" id="fontSize" min="1" max="20" value="5" step="0.5" class="block w-full">
             </div>
             <div class="space-y-2">
                 <label class="block text-sm font-medium text-gray-700">Font Weight</label>
@@ -72,6 +74,11 @@
             </div>
         </div>
 
+        <div class="space-y-2">
+            <label class="block text-sm font-medium text-gray-700">Opacity: <span id="opacityValue">50</span>%</label>
+            <input type="range" id="opacity" min="10" max="100" value="50" class="block w-full">
+        </div>
+
         <div id="previewArea" class="hidden space-y-4">
             <h3 class="font-medium text-lg">Preview (Drag watermark to adjust position)</h3>
             <div id="imagePreview" class="grid grid-cols-2 gap-4"></div>
@@ -84,7 +91,7 @@
     <script>
         const state = {
             images: [],
-            watermarkPos: { xPercent: 50, yPercent: 50 }, // 使用百分比定位
+            watermarkPos: { xPercent: 50, yPercent: 50 },
             isDragging: false,
             dragStartPos: { x: 0, y: 0 }
         };
@@ -94,10 +101,12 @@
             watermarkText: document.getElementById('watermarkText'),
             fontSize: document.getElementById('fontSize'),
             fontFamily: document.getElementById('fontFamily'),
+            opacity: document.getElementById('opacity'),
             previewArea: document.getElementById('previewArea'),
             imagePreview: document.getElementById('imagePreview'),
             downloadAll: document.getElementById('downloadAll'),
-            fontSizeValue: document.getElementById('fontSizeValue')
+            fontSizeValue: document.getElementById('fontSizeValue'),
+            opacityValue: document.getElementById('opacityValue')
         };
 
         function loadImage(file) {
@@ -121,13 +130,18 @@
             
             ctx.drawImage(img, 0, 0);
             
-            ctx.fillStyle = 'rgba(255, 255, 255, 0.5)';
+            const opacity = parseInt(elements.opacity.value) / 100;
+            ctx.fillStyle = `rgba(255, 255, 255, ${opacity})`;
             const weight = document.querySelector('input[name="fontWeight"]:checked').value;
-            ctx.font = `${weight} ${elements.fontSize.value}px "${elements.fontFamily.value}"`;
+            
+            // Calculate font size based on image height percentage
+            const fontSizePercent = parseFloat(elements.fontSize.value);
+            const fontSize = Math.round((fontSizePercent / 100) * canvas.height);
+            
+            ctx.font = `${weight} ${fontSize}px "${elements.fontFamily.value}"`;
             ctx.textAlign = 'center';
             ctx.textBaseline = 'middle';
             
-            // 使用百分比计算实际位置
             const x = (state.watermarkPos.xPercent / 100) * canvas.width;
             const y = (state.watermarkPos.yPercent / 100) * canvas.height;
             
@@ -161,6 +175,8 @@
         }
 
         function handleDragStart(e) {
+            if (e.target.className !== 'drag-overlay') return;
+            
             const overlay = e.target;
             const canvas = overlay.previousElementSibling;
             const rect = canvas.getBoundingClientRect();
@@ -168,7 +184,6 @@
             state.isDragging = true;
             overlay.classList.add('dragging');
             
-            // 记录起始点击位置
             state.dragStartPos = {
                 x: e.clientX,
                 y: e.clientY,
@@ -180,19 +195,18 @@
         function handleDrag(e) {
             if (!state.isDragging) return;
             
-            const overlay = e.target;
+            const overlay = document.querySelector('.dragging');
+            if (!overlay) return;
+            
             const canvas = overlay.previousElementSibling;
             const rect = canvas.getBoundingClientRect();
             
-            // 计算移动的像素距离
             const deltaX = e.clientX - state.dragStartPos.x;
             const deltaY = e.clientY - state.dragStartPos.y;
             
-            // 转换为百分比变化
             const percentX = (deltaX / rect.width) * 100;
             const percentY = (deltaY / rect.height) * 100;
             
-            // 更新位置（加上初始位置）
             state.watermarkPos.xPercent = Math.max(0, Math.min(100, state.dragStartPos.initialXPercent + percentX));
             state.watermarkPos.yPercent = Math.max(0, Math.min(100, state.dragStartPos.initialYPercent + percentY));
             
@@ -217,15 +231,18 @@
         document.addEventListener('mousemove', handleDrag);
         document.addEventListener('mouseup', handleDragEnd);
 
-        [elements.watermarkText, elements.fontFamily, elements.fontSize]
-            .forEach(el => el.addEventListener('input', updateAllPreviews));
+        [elements.watermarkText, elements.fontFamily, elements.fontSize, elements.opacity]
+            .forEach(el => el.addEventListener('input', () => {
+                if (el === elements.fontSize) {
+                    elements.fontSizeValue.textContent = el.value;
+                } else if (el === elements.opacity) {
+                    elements.opacityValue.textContent = el.value;
+                }
+                updateAllPreviews();
+            }));
         
         document.querySelectorAll('input[name="fontWeight"]')
             .forEach(el => el.addEventListener('change', updateAllPreviews));
-
-        elements.fontSize.addEventListener('input', (e) => {
-            elements.fontSizeValue.textContent = e.target.value;
-        });
 
         elements.downloadAll.addEventListener('click', () => {
             const zip = new JSZip();
