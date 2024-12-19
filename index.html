@@ -5,6 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Image Watermark Tool</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Add Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;700&family=Playfair+Display:wght@400;700&family=Montserrat:wght@400;700&family=Open+Sans:wght@400;700&family=Lora:wght@400;700&display=swap" rel="stylesheet">
 </head>
 <body class="bg-gray-50">
     <div class="max-w-2xl mx-auto p-4 space-y-4">
@@ -30,6 +32,51 @@
                 value="Watermark"
                 class="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm p-2"
             />
+        </div>
+
+        <div class="grid grid-cols-2 gap-4">
+            <div class="space-y-2">
+                <label class="block text-sm font-medium text-gray-700">
+                    Font Family
+                </label>
+                <select
+                    id="fontFamily"
+                    class="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm p-2"
+                >
+                    <option value="Roboto" style="font-family: 'Roboto'">Roboto</option>
+                    <option value="Playfair Display" style="font-family: 'Playfair Display'">Playfair Display</option>
+                    <option value="Montserrat" style="font-family: 'Montserrat'">Montserrat</option>
+                    <option value="Open Sans" style="font-family: 'Open Sans'">Open Sans</option>
+                    <option value="Lora" style="font-family: 'Lora'">Lora</option>
+                </select>
+            </div>
+
+            <div class="space-y-2">
+                <label class="block text-sm font-medium text-gray-700">
+                    Font Weight
+                </label>
+                <div class="flex items-center space-x-4 mt-2">
+                    <label class="inline-flex items-center">
+                        <input
+                            type="radio"
+                            name="fontWeight"
+                            value="normal"
+                            checked
+                            class="form-radio text-blue-600"
+                        >
+                        <span class="ml-2">Normal</span>
+                    </label>
+                    <label class="inline-flex items-center">
+                        <input
+                            type="radio"
+                            name="fontWeight"
+                            value="bold"
+                            class="form-radio text-blue-600"
+                        >
+                        <span class="ml-2">Bold</span>
+                    </label>
+                </div>
+            </div>
         </div>
 
         <div class="space-y-2">
@@ -107,6 +154,8 @@
         const position = document.getElementById('position');
         const fontSize = document.getElementById('fontSize');
         const fontSizeValue = document.getElementById('fontSizeValue');
+        const fontFamily = document.getElementById('fontFamily');
+        const fontWeightInputs = document.getElementsByName('fontWeight');
         const canvas = document.getElementById('canvas');
         const canvasContainer = document.getElementById('canvasContainer');
         const placeholder = document.getElementById('placeholder');
@@ -140,6 +189,12 @@
         // Handle watermark text change
         watermarkText.addEventListener('input', updateCanvas);
         position.addEventListener('change', updateCanvas);
+        fontFamily.addEventListener('change', updateCanvas);
+        
+        // Handle font weight change
+        fontWeightInputs.forEach(input => {
+            input.addEventListener('change', updateCanvas);
+        });
 
         // Handle download
         downloadBtn.addEventListener('click', () => {
@@ -148,6 +203,11 @@
             link.href = canvas.toDataURL();
             link.click();
         });
+
+        function getFontWeight() {
+            const selectedWeight = Array.from(fontWeightInputs).find(input => input.checked);
+            return selectedWeight.value;
+        }
 
         function updateCanvas() {
             if (!currentImage) return;
@@ -163,7 +223,8 @@
 
             // Configure watermark
             ctx.fillStyle = 'rgba(255, 255, 255, 0.5)';
-            ctx.font = `${fontSize.value}px Arial`;
+            const weight = getFontWeight();
+            ctx.font = `${weight} ${fontSize.value}px "${fontFamily.value}"`;
             ctx.textAlign = positions[position.value].align;
             ctx.textBaseline = 'middle';
 
