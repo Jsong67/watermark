@@ -3,282 +3,179 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Image Watermark Tool</title>
+    <title>Batch Image Watermark Tool</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;700&family=Playfair+Display:wght@400;700&family=Montserrat:wght@400;700&family=Open+Sans:wght@400;700&family=Lora:wght@400;700&display=swap" rel="stylesheet">
-    <style>
-        #canvasWrapper {
-            position: relative;
-            display: inline-block;
-        }
-        #dragOverlay {
-            position: absolute;
-            top: 0;
-            left: 0;
-            cursor: move;
-            user-select: none;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-        }
-        .dragging {
-            cursor: grabbing !important;
-        }
-    </style>
 </head>
 <body class="bg-gray-50">
-    <div class="max-w-2xl mx-auto p-4 space-y-4">
+    <div class="max-w-3xl mx-auto p-4 space-y-4">
+        <!-- File Upload -->
         <div class="space-y-2">
-            <label class="block text-sm font-medium text-gray-700">
-                Upload Image
-            </label>
-            <input
-                type="file"
-                accept="image/*"
-                id="imageInput"
-                class="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
-            />
+            <label class="block text-sm font-medium text-gray-700">Upload Images</label>
+            <input type="file" accept="image/*" id="imageInput" multiple
+                class="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100">
+            <p class="text-sm text-gray-500">Select multiple images to add watermark to all of them</p>
         </div>
 
-        <div class="space-y-2">
-            <label class="block text-sm font-medium text-gray-700">
-                Watermark Text
-            </label>
-            <input
-                type="text"
-                id="watermarkText"
-                value="Watermark"
-                class="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm p-2"
-            />
+        <!-- Watermark Settings -->
+        <div class="grid grid-cols-2 gap-4">
+            <div class="space-y-2">
+                <label class="block text-sm font-medium text-gray-700">Watermark Text</label>
+                <input type="text" id="watermarkText" value="Watermark" 
+                    class="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm p-2">
+            </div>
+            <div class="space-y-2">
+                <label class="block text-sm font-medium text-gray-700">Font Family</label>
+                <select id="fontFamily" 
+                    class="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm p-2">
+                    <option value="Roboto">Roboto</option>
+                    <option value="Playfair Display">Playfair Display</option>
+                    <option value="Montserrat">Montserrat</option>
+                    <option value="Open Sans">Open Sans</option>
+                    <option value="Lora">Lora</option>
+                </select>
+            </div>
         </div>
 
         <div class="grid grid-cols-2 gap-4">
             <div class="space-y-2">
-                <label class="block text-sm font-medium text-gray-700">
-                    Font Family
-                </label>
-                <select
-                    id="fontFamily"
-                    class="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm p-2"
-                >
-                    <option value="Roboto" style="font-family: 'Roboto'">Roboto</option>
-                    <option value="Playfair Display" style="font-family: 'Playfair Display'">Playfair Display</option>
-                    <option value="Montserrat" style="font-family: 'Montserrat'">Montserrat</option>
-                    <option value="Open Sans" style="font-family: 'Open Sans'">Open Sans</option>
-                    <option value="Lora" style="font-family: 'Lora'">Lora</option>
-                </select>
+                <label class="block text-sm font-medium text-gray-700">Font Size: <span id="fontSizeValue">48</span>px</label>
+                <input type="range" id="fontSize" min="12" max="120" value="48" class="block w-full">
             </div>
-
             <div class="space-y-2">
-                <label class="block text-sm font-medium text-gray-700">
-                    Font Weight
-                </label>
-                <div class="flex items-center space-x-4 mt-2">
+                <label class="block text-sm font-medium text-gray-700">Font Weight</label>
+                <div class="flex space-x-4">
                     <label class="inline-flex items-center">
-                        <input
-                            type="radio"
-                            name="fontWeight"
-                            value="normal"
-                            checked
-                            class="form-radio text-blue-600"
-                        >
+                        <input type="radio" name="fontWeight" value="normal" checked class="form-radio">
                         <span class="ml-2">Normal</span>
                     </label>
                     <label class="inline-flex items-center">
-                        <input
-                            type="radio"
-                            name="fontWeight"
-                            value="bold"
-                            class="form-radio text-blue-600"
-                        >
+                        <input type="radio" name="fontWeight" value="bold" class="form-radio">
                         <span class="ml-2">Bold</span>
                     </label>
                 </div>
             </div>
         </div>
 
-        <div class="space-y-2">
-            <label class="block text-sm font-medium text-gray-700">
-                Font Size: <span id="fontSizeValue">48</span>px
-            </label>
-            <input
-                type="range"
-                id="fontSize"
-                min="12"
-                max="120"
-                value="48"
-                class="block w-full"
-            />
-        </div>
-
-        <div id="canvasContainer" class="space-y-4 hidden">
-            <div id="canvasWrapper" class="inline-block">
-                <canvas
-                    id="canvas"
-                    class="max-w-full h-auto border rounded-lg"
-                ></canvas>
-                <div id="dragOverlay"></div>
-            </div>
-            <p class="text-sm text-gray-600 italic mt-2">
-                Drag the watermark text to adjust its position
-            </p>
-            <button
-                id="downloadBtn"
-                class="w-full bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700 transition-colors"
-            >
-                Download Watermarked Image
+        <!-- Preview and Download Area -->
+        <div id="previewArea" class="hidden space-y-4">
+            <h3 class="font-medium text-lg">Preview</h3>
+            <div id="imagePreview" class="grid grid-cols-2 gap-4"></div>
+            <button id="downloadAll" class="w-full bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700">
+                Download All Images
             </button>
-        </div>
-
-        <div id="placeholder" class="border-2 border-dashed border-gray-300 rounded-lg p-12 text-center">
-            <p class="text-gray-500">
-                Upload an image to add watermark
-            </p>
         </div>
     </div>
 
     <script>
-        let currentImage = null;
-        let watermarkPosition = { x: 0, y: 0 };
-        let isDragging = false;
-        let dragOffset = { x: 0, y: 0 };
+        const state = {
+            images: [],
+            watermarkPos: { x: 0, y: 0 },
+            isDragging: false,
+            currentImageIndex: 0
+        };
 
-        // Get DOM elements
-        const imageInput = document.getElementById('imageInput');
-        const watermarkText = document.getElementById('watermarkText');
-        const fontSize = document.getElementById('fontSize');
-        const fontSizeValue = document.getElementById('fontSizeValue');
-        const fontFamily = document.getElementById('fontFamily');
-        const fontWeightInputs = document.getElementsByName('fontWeight');
-        const canvas = document.getElementById('canvas');
-        const canvasContainer = document.getElementById('canvasContainer');
-        const placeholder = document.getElementById('placeholder');
-        const downloadBtn = document.getElementById('downloadBtn');
-        const dragOverlay = document.getElementById('dragOverlay');
+        // DOM Elements
+        const elements = {
+            imageInput: document.getElementById('imageInput'),
+            watermarkText: document.getElementById('watermarkText'),
+            fontSize: document.getElementById('fontSize'),
+            fontFamily: document.getElementById('fontFamily'),
+            previewArea: document.getElementById('previewArea'),
+            imagePreview: document.getElementById('imagePreview'),
+            downloadAll: document.getElementById('downloadAll'),
+            fontSizeValue: document.getElementById('fontSizeValue')
+        };
 
-        // Initialize watermark position to center
-        function initWatermarkPosition() {
-            if (!currentImage) return;
-            watermarkPosition = {
-                x: canvas.width / 2,
-                y: canvas.height / 2
-            };
-        }
-
-        // Update font size display
-        fontSize.addEventListener('input', (e) => {
-            fontSizeValue.textContent = e.target.value;
-            updateCanvas();
-        });
-
-        // Handle image upload
-        imageInput.addEventListener('change', (e) => {
-            const file = e.target.files[0];
-            if (file) {
+        // Load image file
+        function loadImage(file) {
+            return new Promise((resolve) => {
                 const reader = new FileReader();
                 reader.onload = (e) => {
                     const img = new Image();
-                    img.onload = () => {
-                        currentImage = img;
-                        initWatermarkPosition();
-                        updateCanvas();
-                        canvasContainer.classList.remove('hidden');
-                        placeholder.classList.add('hidden');
-                        setupDragOverlay();
-                    };
+                    img.onload = () => resolve(img);
                     img.src = e.target.result;
                 };
                 reader.readAsDataURL(file);
-            }
-        });
-
-        // Handle watermark text change
-        watermarkText.addEventListener('input', updateCanvas);
-        fontFamily.addEventListener('change', updateCanvas);
-        
-        // Handle font weight change
-        fontWeightInputs.forEach(input => {
-            input.addEventListener('change', updateCanvas);
-        });
-
-        // Setup drag overlay
-        function setupDragOverlay() {
-            dragOverlay.style.width = canvas.width + 'px';
-            dragOverlay.style.height = canvas.height + 'px';
+            });
         }
 
-        // Drag events
-        dragOverlay.addEventListener('mousedown', startDragging);
-        document.addEventListener('mousemove', drag);
-        document.addEventListener('mouseup', stopDragging);
-
-        function startDragging(e) {
-            isDragging = true;
-            dragOverlay.classList.add('dragging');
-            const rect = canvas.getBoundingClientRect();
-            const scaleX = canvas.width / rect.width;
-            const scaleY = canvas.height / rect.height;
-            
-            dragOffset.x = (e.clientX - rect.left) * scaleX - watermarkPosition.x;
-            dragOffset.y = (e.clientY - rect.top) * scaleY - watermarkPosition.y;
-        }
-
-        function drag(e) {
-            if (!isDragging) return;
-            
-            const rect = canvas.getBoundingClientRect();
-            const scaleX = canvas.width / rect.width;
-            const scaleY = canvas.height / rect.height;
-            
-            watermarkPosition.x = (e.clientX - rect.left) * scaleX - dragOffset.x;
-            watermarkPosition.y = (e.clientY - rect.top) * scaleY - dragOffset.y;
-            
-            updateCanvas();
-        }
-
-        function stopDragging() {
-            isDragging = false;
-            dragOverlay.classList.remove('dragging');
-        }
-
-        // Handle download
-        downloadBtn.addEventListener('click', () => {
-            const link = document.createElement('a');
-            link.download = 'watermarked-image.png';
-            link.href = canvas.toDataURL();
-            link.click();
-        });
-
-        function getFontWeight() {
-            const selectedWeight = Array.from(fontWeightInputs).find(input => input.checked);
-            return selectedWeight.value;
-        }
-
-        function updateCanvas() {
-            if (!currentImage) return;
-
+        // Create canvas with watermark
+        function createWatermarkedCanvas(img) {
+            const canvas = document.createElement('canvas');
             const ctx = canvas.getContext('2d');
-
-            // Set canvas dimensions to match image
-            canvas.width = currentImage.width;
-            canvas.height = currentImage.height;
-
-            // Update drag overlay size
-            setupDragOverlay();
-
-            // Draw the image
-            ctx.drawImage(currentImage, 0, 0);
-
+            
+            canvas.width = img.width;
+            canvas.height = img.height;
+            
+            ctx.drawImage(img, 0, 0);
+            
             // Configure watermark
             ctx.fillStyle = 'rgba(255, 255, 255, 0.5)';
-            const weight = getFontWeight();
-            ctx.font = `${weight} ${fontSize.value}px "${fontFamily.value}"`;
+            const weight = document.querySelector('input[name="fontWeight"]:checked').value;
+            ctx.font = `${weight} ${elements.fontSize.value}px "${elements.fontFamily.value}"`;
             ctx.textAlign = 'center';
             ctx.textBaseline = 'middle';
-
-            // Add watermark text at current position
-            ctx.fillText(watermarkText.value, watermarkPosition.x, watermarkPosition.y);
+            
+            // Add watermark at center
+            ctx.fillText(
+                elements.watermarkText.value,
+                canvas.width / 2,
+                canvas.height / 2
+            );
+            
+            return canvas;
         }
+
+        // Update preview
+        async function updatePreview() {
+            elements.imagePreview.innerHTML = '';
+            
+            for (const img of state.images) {
+                const canvas = createWatermarkedCanvas(img);
+                canvas.className = 'w-full h-auto border rounded';
+                elements.imagePreview.appendChild(canvas);
+            }
+        }
+
+        // Event Listeners
+        elements.imageInput.addEventListener('change', async (e) => {
+            state.images = await Promise.all(
+                Array.from(e.target.files).map(loadImage)
+            );
+            elements.previewArea.classList.remove('hidden');
+            updatePreview();
+        });
+
+        [elements.watermarkText, elements.fontFamily, elements.fontSize]
+            .forEach(el => el.addEventListener('input', updatePreview));
+        
+        document.querySelectorAll('input[name="fontWeight"]')
+            .forEach(el => el.addEventListener('change', updatePreview));
+
+        elements.fontSize.addEventListener('input', (e) => {
+            elements.fontSizeValue.textContent = e.target.value;
+        });
+
+        // Download functionality
+        elements.downloadAll.addEventListener('click', () => {
+            const zip = new JSZip();
+            
+            state.images.forEach((img, i) => {
+                const canvas = createWatermarkedCanvas(img);
+                const dataUrl = canvas.toDataURL('image/png');
+                const base64Data = dataUrl.split(',')[1];
+                zip.file(`watermarked-${i + 1}.png`, base64Data, {base64: true});
+            });
+            
+            zip.generateAsync({type: 'blob'}).then(blob => {
+                const link = document.createElement('a');
+                link.href = URL.createObjectURL(blob);
+                link.download = 'watermarked-images.zip';
+                link.click();
+            });
+        });
     </script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 </body>
 </html>
