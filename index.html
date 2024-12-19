@@ -1,6 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
-<!-- Head部分保持不变 -->
+<!-- 前面的 HEAD 部分保持不变 -->
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -26,8 +26,9 @@
     </style>
 </head>
 <body class="bg-gray-50">
-    <!-- Body HTML部分保持不变 -->
+    <!-- Body HTML 部分保持不变 -->
     <div class="max-w-3xl mx-auto p-4 space-y-4">
+        <!-- 与之前相同的 HTML 内容 -->
         <div class="space-y-2">
             <label class="block text-sm font-medium text-gray-700">Upload Images</label>
             <input type="file" accept="image/*" id="imageInput" multiple
@@ -132,6 +133,16 @@
             };
         }
 
+        function isInCenterRegion(x, y, centerX, centerY, width, height) {
+            // 定义中心区域的大小（图片尺寸的20%）
+            const centerRegionSize = 0.2;
+            const centerRegionHalfWidth = width * centerRegionSize / 2;
+            const centerRegionHalfHeight = height * centerRegionSize / 2;
+            
+            return Math.abs(x - centerX) <= centerRegionHalfWidth && 
+                   Math.abs(y - centerY) <= centerRegionHalfHeight;
+        }
+
         function createWatermarkedCanvas(img) {
             const canvas = document.createElement('canvas');
             const ctx = canvas.getContext('2d');
@@ -151,8 +162,6 @@
             const fontSize = Math.round((fontSizePercent / 100) * canvas.height);
             
             ctx.font = `${weight} ${fontSize}px "${elements.fontFamily.value}"`;
-            ctx.textAlign = 'center';
-            ctx.textBaseline = 'middle';
             
             const text = elements.watermarkText.value;
             const metrics = getTextMetrics(ctx, text);
@@ -161,27 +170,33 @@
             let x = state.watermarkPos.x * canvas.width;
             let y = state.watermarkPos.y * canvas.height;
             
-            // 根据象限调整位置
+            // 计算中心点
             const centerX = canvas.width / 2;
             const centerY = canvas.height / 2;
             
-            // 确定点击位置在哪个象限
-            const isLeft = x < centerX;
-            const isTop = y < centerY;
-            
-            // 根据象限调整文本对齐方式
-            if (isLeft) {
-                ctx.textAlign = 'left';
+            // 检查是否在中心区域
+            if (isInCenterRegion(x, y, centerX, centerY, canvas.width, canvas.height)) {
+                // 在中心区域，使用居中对齐
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                x = centerX;
+                y = centerY;
             } else {
-                ctx.textAlign = 'right';
-                x = Math.min(x, canvas.width);
-            }
-            
-            if (isTop) {
-                ctx.textBaseline = 'top';
-            } else {
-                ctx.textBaseline = 'bottom';
-                y = Math.min(y, canvas.height);
+                // 不在中心区域，根据象限决定对齐方式
+                const isLeft = x < centerX;
+                const isTop = y < centerY;
+                
+                if (isLeft) {
+                    ctx.textAlign = 'left';
+                } else {
+                    ctx.textAlign = 'right';
+                }
+                
+                if (isTop) {
+                    ctx.textBaseline = 'top';
+                } else {
+                    ctx.textBaseline = 'bottom';
+                }
             }
             
             // 绘制水印
