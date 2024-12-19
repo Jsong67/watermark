@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>图片水印工具</title>
+    <title>图片批量加水印工具</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;700&family=Ma+Shan+Zheng&family=ZCOOL+XiaoWei&family=ZCOOL+KuaiLe&family=ZCOOL+QingKe+HuangYou&display=swap" rel="stylesheet">
     <style>
@@ -90,6 +90,9 @@
             <button id="downloadAll" class="w-full bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700">
                 在新页面中查看所有图片
             </button>
+            <button id="saveAll" class="flex-1 bg-green-600 text-white py-2 px-4 rounded-md hover:bg-green-700">  
+                保存所有图片  
+            </button>  
         </div>
     </div>
 
@@ -187,7 +190,27 @@
                 els.imagePreview.appendChild(wrapper);
             });
         }
-
+        // 在 els 对象中添加新按钮  
+        saveAll: $('saveAll'),  
+        
+        // 添加保存所有图片的事件处理  
+        els.saveAll.onclick = () => {  
+            state.images.forEach((img, i) => {  
+                const canvas = createWatermarkedCanvas(img);  
+                // 创建下载链接  
+                const link = document.createElement('a');  
+                link.href = canvas.toDataURL('image/png');  
+                link.download = `水印图片_${i + 1}.png`;  
+                // 触发下载  
+                document.body.appendChild(link);  
+                link.click();  
+                document.body.removeChild(link);  
+                // 添加少许延迟，避免浏览器限制  
+                if (i < state.images.length - 1) {  
+                    setTimeout(() => {}, 100);  
+                }  
+            });  
+        };  
         // Event Listeners
         els.imageInput.onchange = async e => {
             state.images = await Promise.all(Array.from(e.target.files).map(loadImage));
