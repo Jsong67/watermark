@@ -19,7 +19,7 @@
 </head>
 <body class="bg-gray-50">
     <div class="max-w-3xl mx-auto p-4 space-y-4">
-        <h1 class="text-2xl font-bold text-center text-gray-800 mb-6">图片水印工具</h1>
+        <h1 class="text-2xl font-bold text-center text-gray-800 mb-6">图片批量加水印工具</h1>
         
         <div class="space-y-2">
             <label class="block text-sm font-medium text-gray-700">选择图片</label>
@@ -87,12 +87,14 @@
         <div id="previewArea" class="hidden space-y-4">
             <h3 class="font-medium text-lg">预览（拖动水印调整位置）</h3>
             <div id="imagePreview" class="grid gap-4"></div>
-            <button id="downloadAll" class="w-full bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700">
-                在新页面中查看所有图片
-            </button>
-            <button id="saveAll" class="flex-1 bg-green-600 text-white py-2 px-4 rounded-md hover:bg-green-700">  
-                保存所有图片  
-            </button>  
+            <div class="flex gap-4">
+                <button id="downloadAll" class="flex-1 bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700">
+                    在新页面中查看
+                </button>
+                <button id="saveAll" class="flex-1 bg-green-600 text-white py-2 px-4 rounded-md hover:bg-green-700">
+                    保存所有图片
+                </button>
+            </div>
         </div>
     </div>
 
@@ -124,6 +126,7 @@
             previewArea: $('previewArea'),
             imagePreview: $('imagePreview'),
             downloadAll: $('downloadAll'),
+            saveAll: $('saveAll'),
             fontSizeValue: $('fontSizeValue'),
             opacityValue: $('opacityValue'),
             positionPreset: $('positionPreset')
@@ -190,27 +193,7 @@
                 els.imagePreview.appendChild(wrapper);
             });
         }
-        // 在 els 对象中添加新按钮  
-        saveAll: $('saveAll'),  
-        
-        // 添加保存所有图片的事件处理  
-        els.saveAll.onclick = () => {  
-            state.images.forEach((img, i) => {  
-                const canvas = createWatermarkedCanvas(img);  
-                // 创建下载链接  
-                const link = document.createElement('a');  
-                link.href = canvas.toDataURL('image/png');  
-                link.download = `水印图片_${i + 1}.png`;  
-                // 触发下载  
-                document.body.appendChild(link);  
-                link.click();  
-                document.body.removeChild(link);  
-                // 添加少许延迟，避免浏览器限制  
-                if (i < state.images.length - 1) {  
-                    setTimeout(() => {}, 100);  
-                }  
-            });  
-        };  
+
         // Event Listeners
         els.imageInput.onchange = async e => {
             state.images = await Promise.all(Array.from(e.target.files).map(loadImage));
@@ -261,10 +244,11 @@
             el.onchange = updatePreviews;
         });
 
+        // 查看所有图片
         els.downloadAll.onclick = () => {
             const win = window.open('', '_blank');
             win.document.write(`
-                <html><head><title>水印图片</title>
+                <html><head><title>水印图片预览</title>
                 <meta name="viewport" content="width=device-width, initial-scale=1.0">
                 <style>
                     body { margin: 20px; font-family: sans-serif; }
@@ -288,6 +272,23 @@
             
             win.document.write('</body></html>');
             win.document.close();
+        };
+
+        // 保存所有图片
+        els.saveAll.onclick = () => {
+            state.images.forEach((img, i) => {
+                const canvas = createWatermarkedCanvas(img);
+                const link = document.createElement('a');
+                link.href = canvas.toDataURL('image/png');
+                link.download = `水印图片_${i + 1}.png`;
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+                // 添加少许延迟，避免浏览器限制
+                if (i < state.images.length - 1) {
+                    setTimeout(() => {}, 100);
+                }
+            });
         };
     })();
     </script>
