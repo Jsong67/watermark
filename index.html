@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Image Watermark Tool</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-50">
+    <div class="max-w-2xl mx-auto p-4 space-y-4">
+        <div class="space-y-2">
+            <label class="block text-sm font-medium text-gray-700">
+                Upload Image
+            </label>
+            <input
+                type="file"
+                accept="image/*"
+                id="imageInput"
+                class="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
+            />
+        </div>
+
+        <div class="space-y-2">
+            <label class="block text-sm font-medium text-gray-700">
+                Watermark Text
+            </label>
+            <input
+                type="text"
+                id="watermarkText"
+                value="Watermark"
+                class="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm p-2"
+            />
+        </div>
+
+        <div class="space-y-2">
+            <label class="block text-sm font-medium text-gray-700">
+                Watermark Position
+            </label>
+            <select
+                id="position"
+                class="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm p-2"
+            >
+                <option value="top-left">Top Left</option>
+                <option value="top-center">Top Center</option>
+                <option value="top-right">Top Right</option>
+                <option value="center-left">Center Left</option>
+                <option value="center" selected>Center</option>
+                <option value="center-right">Center Right</option>
+                <option value="bottom-left">Bottom Left</option>
+                <option value="bottom-center">Bottom Center</option>
+                <option value="bottom-right">Bottom Right</option>
+            </select>
+        </div>
+
+        <div class="space-y-2">
+            <label class="block text-sm font-medium text-gray-700">
+                Font Size: <span id="fontSizeValue">48</span>px
+            </label>
+            <input
+                type="range"
+                id="fontSize"
+                min="12"
+                max="120"
+                value="48"
+                class="block w-full"
+            />
+        </div>
+
+        <div id="canvasContainer" class="space-y-4 hidden">
+            <canvas
+                id="canvas"
+                class="max-w-full h-auto border rounded-lg"
+            ></canvas>
+            <button
+                id="downloadBtn"
+                class="w-full bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700 transition-colors"
+            >
+                Download Watermarked Image
+            </button>
+        </div>
+
+        <div id="placeholder" class="border-2 border-dashed border-gray-300 rounded-lg p-12 text-center">
+            <p class="text-gray-500">
+                Upload an image to add watermark
+            </p>
+        </div>
+    </div>
+
+    <script>
+        const positions = {
+            'top-left': { x: 20, y: 40, align: 'left' },
+            'top-center': { x: '50%', y: 40, align: 'center' },
+            'top-right': { x: -20, y: 40, align: 'right' },
+            'center-left': { x: 20, y: '50%', align: 'left' },
+            'center': { x: '50%', y: '50%', align: 'center' },
+            'center-right': { x: -20, y: '50%', align: 'right' },
+            'bottom-left': { x: 20, y: -40, align: 'left' },
+            'bottom-center': { x: '50%', y: -40, align: 'center' },
+            'bottom-right': { x: -20, y: -40, align: 'right' }
+        };
+
+        let currentImage = null;
+
+        // Get DOM elements
+        const imageInput = document.getElementById('imageInput');
+        const watermarkText = document.getElementById('watermarkText');
+        const position = document.getElementById('position');
+        const fontSize = document.getElementById('fontSize');
+        const fontSizeValue = document.getElementById('fontSizeValue');
+        const canvas = document.getElementById('canvas');
+        const canvasContainer = document.getElementById('canvasContainer');
+        const placeholder = document.getElementById('placeholder');
+        const downloadBtn = document.getElementById('downloadBtn');
+
+        // Update font size display
+        fontSize.addEventListener('input', (e) => {
+            fontSizeValue.textContent = e.target.value;
+            updateCanvas();
+        });
+
+        // Handle image upload
+        imageInput.addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    const img = new Image();
+                    img.onload = () => {
+                        currentImage = img;
+                        updateCanvas();
+                        canvasContainer.classList.remove('hidden');
+                        placeholder.classList.add('hidden');
+                    };
+                    img.src = e.target.result;
+                };
+                reader.readAsDataURL(file);
+            }
+        });
+
+        // Handle watermark text change
+        watermarkText.addEventListener('input', updateCanvas);
+        position.addEventListener('change', updateCanvas);
+
+        // Handle download
+        downloadBtn.addEventListener('click', () => {
+            const link = document.createElement('a');
+            link.download = 'watermarked-image.png';
+            link.href = canvas.toDataURL();
+            link.click();
+        });
+
+        function updateCanvas() {
+            if (!currentImage) return;
+
+            const ctx = canvas.getContext('2d');
+
+            // Set canvas dimensions to match image
+            canvas.width = currentImage.width;
+            canvas.height = currentImage.height;
+
+            // Draw the image
+            ctx.drawImage(currentImage, 0, 0);
+
+            // Configure watermark
+            ctx.fillStyle = 'rgba(255, 255, 255, 0.5)';
+            ctx.font = `${fontSize.value}px Arial`;
+            ctx.textAlign = positions[position.value].align;
+            ctx.textBaseline = 'middle';
+
+            // Calculate position
+            let x = positions[position.value].x;
+            let y = positions[position.value].y;
+
+            // Convert percentage positions to actual coordinates
+            if (typeof x === 'string' && x.includes('%')) {
+                x = (parseInt(x) / 100) * canvas.width;
+            }
+            if (typeof y === 'string' && y.includes('%')) {
+                y = (parseInt(y) / 100) * canvas.height;
+            }
+            if (y < 0) {
+                y = canvas.height + y;
+            }
+            if (x < 0) {
+                x = canvas.width + x;
+            }
+
+            // Add watermark text
+            ctx.fillText(watermarkText.value, x, y);
+        }
+    </script>
+</body>
+</html>
