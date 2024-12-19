@@ -7,14 +7,38 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;700&family=Ma+Shan+Zheng&family=ZCOOL+XiaoWei&family=ZCOOL+KuaiLe&family=ZCOOL+QingKe+HuangYou&display=swap" rel="stylesheet">
     <style>
-        .canvas-wrapper { position: relative; }
+        .canvas-wrapper { 
+            position: relative; 
+            margin-bottom: 1rem;
+        }
         .drag-overlay {
             position: absolute;
-            top: 0; left: 0;
-            width: 100%; height: 100%;
+            top: 0;
+            left: 0;
+            width: 100%;
             cursor: move;
+            z-index: 10;
         }
-        .dragging { cursor: grabbing !important; }
+        .dragging { 
+            cursor: grabbing !important; 
+        }
+        .button-container {
+            position: absolute;
+            bottom: 8px;
+            right: 8px;
+            z-index: 20;
+        }
+        .save-button {
+            background-color: rgb(37, 99, 235);
+            color: white;
+            padding: 4px 12px;
+            border-radius: 6px;
+            font-size: 14px;
+            transition: background-color 0.2s;
+        }
+        .save-button:hover {
+            background-color: rgb(29, 78, 216);
+        }
     </style>
 </head>
 <body class="bg-gray-50">
@@ -180,16 +204,26 @@
                 
                 const overlay = document.createElement('div');
                 overlay.className = 'drag-overlay';
+                overlay.style.height = 'calc(100% - 40px)';
+                
+                const buttonContainer = document.createElement('div');
+                buttonContainer.className = 'button-container';
                 
                 const saveBtn = document.createElement('button');
-                saveBtn.className = 'absolute bottom-2 right-2 bg-blue-600 text-white px-3 py-1 rounded-md text-sm z-10';
+                saveBtn.className = 'save-button';
                 saveBtn.textContent = '保存';
-                saveBtn.onclick = e => {
-                    e.preventDefault();
-                    window.open(canvas.toDataURL('image/png'), '_blank');
+                saveBtn.onclick = (e) => {
+                    e.stopPropagation();
+                    const link = document.createElement('a');
+                    link.href = canvas.toDataURL('image/png');
+                    link.download = `水印图片_${i + 1}.png`;
+                    document.body.appendChild(link);
+                    link.click();
+                    document.body.removeChild(link);
                 };
                 
-                wrapper.append(canvas, overlay, saveBtn);
+                buttonContainer.appendChild(saveBtn);
+                wrapper.append(canvas, overlay, buttonContainer);
                 els.imagePreview.appendChild(wrapper);
             });
         }
@@ -210,6 +244,7 @@
 
         els.imagePreview.onmousedown = e => {
             if (!e.target.classList.contains('drag-overlay')) return;
+            e.preventDefault();
             state.isDragging = true;
             state.currentCanvas = e.target.previousElementSibling;
             state.dragStartPos = state.currentCanvas.getBoundingClientRect();
@@ -244,7 +279,6 @@
             el.onchange = updatePreviews;
         });
 
-        // 查看所有图片
         els.downloadAll.onclick = () => {
             const win = window.open('', '_blank');
             win.document.write(`
@@ -274,7 +308,6 @@
             win.document.close();
         };
 
-        // 保存所有图片
         els.saveAll.onclick = () => {
             state.images.forEach((img, i) => {
                 const canvas = createWatermarkedCanvas(img);
@@ -284,7 +317,6 @@
                 document.body.appendChild(link);
                 link.click();
                 document.body.removeChild(link);
-                // 添加少许延迟，避免浏览器限制
                 if (i < state.images.length - 1) {
                     setTimeout(() => {}, 100);
                 }
