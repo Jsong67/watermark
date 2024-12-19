@@ -6,10 +6,26 @@
     <title>Batch Image Watermark Tool</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;700&family=Playfair+Display:wght@400;700&family=Montserrat:wght@400;700&family=Open+Sans:wght@400;700&family=Lora:wght@400;700&display=swap" rel="stylesheet">
+    <style>
+        .canvas-wrapper {
+            position: relative;
+            display: inline-block;
+        }
+        .drag-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            cursor: move;
+        }
+        .dragging {
+            cursor: grabbing !important;
+        }
+    </style>
 </head>
 <body class="bg-gray-50">
     <div class="max-w-3xl mx-auto p-4 space-y-4">
-        <!-- File Upload -->
         <div class="space-y-2">
             <label class="block text-sm font-medium text-gray-700">Upload Images</label>
             <input type="file" accept="image/*" id="imageInput" multiple
@@ -17,7 +33,6 @@
             <p class="text-sm text-gray-500">Select multiple images to add watermark to all of them</p>
         </div>
 
-        <!-- Watermark Settings -->
         <div class="grid grid-cols-2 gap-4">
             <div class="space-y-2">
                 <label class="block text-sm font-medium text-gray-700">Watermark Text</label>
@@ -57,9 +72,8 @@
             </div>
         </div>
 
-        <!-- Preview and Download Area -->
         <div id="previewArea" class="hidden space-y-4">
-            <h3 class="font-medium text-lg">Preview</h3>
+            <h3 class="font-medium text-lg">Preview (Drag watermark to adjust position)</h3>
             <div id="imagePreview" class="grid grid-cols-2 gap-4"></div>
             <button id="downloadAll" class="w-full bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700">
                 Download All Images
@@ -70,12 +84,11 @@
     <script>
         const state = {
             images: [],
-            watermarkPos: { x: 0, y: 0 },
+            watermarkPos: { xPercent: 50, yPercent: 50 }, // 使用百分比定位
             isDragging: false,
-            currentImageIndex: 0
+            dragStartPos: { x: 0, y: 0 }
         };
 
-        // DOM Elements
         const elements = {
             imageInput: document.getElementById('imageInput'),
             watermarkText: document.getElementById('watermarkText'),
@@ -87,7 +100,6 @@
             fontSizeValue: document.getElementById('fontSizeValue')
         };
 
-        // Load image file
         function loadImage(file) {
             return new Promise((resolve) => {
                 const reader = new FileReader();
@@ -100,7 +112,6 @@
             });
         }
 
-        // Create canvas with watermark
         function createWatermarkedCanvas(img) {
             const canvas = document.createElement('canvas');
             const ctx = canvas.getContext('2d');
@@ -110,54 +121,112 @@
             
             ctx.drawImage(img, 0, 0);
             
-            // Configure watermark
             ctx.fillStyle = 'rgba(255, 255, 255, 0.5)';
             const weight = document.querySelector('input[name="fontWeight"]:checked').value;
             ctx.font = `${weight} ${elements.fontSize.value}px "${elements.fontFamily.value}"`;
             ctx.textAlign = 'center';
             ctx.textBaseline = 'middle';
             
-            // Add watermark at center
-            ctx.fillText(
-                elements.watermarkText.value,
-                canvas.width / 2,
-                canvas.height / 2
-            );
+            // 使用百分比计算实际位置
+            const x = (state.watermarkPos.xPercent / 100) * canvas.width;
+            const y = (state.watermarkPos.yPercent / 100) * canvas.height;
+            
+            ctx.fillText(elements.watermarkText.value, x, y);
             
             return canvas;
         }
 
-        // Update preview
-        async function updatePreview() {
-            elements.imagePreview.innerHTML = '';
+        function createPreviewElement(img, index) {
+            const wrapper = document.createElement('div');
+            wrapper.className = 'canvas-wrapper';
             
-            for (const img of state.images) {
-                const canvas = createWatermarkedCanvas(img);
-                canvas.className = 'w-full h-auto border rounded';
-                elements.imagePreview.appendChild(canvas);
-            }
+            const canvas = createWatermarkedCanvas(img);
+            canvas.className = 'w-full h-auto border rounded';
+            
+            const overlay = document.createElement('div');
+            overlay.className = 'drag-overlay';
+            overlay.dataset.index = index;
+            
+            wrapper.appendChild(canvas);
+            wrapper.appendChild(overlay);
+            
+            return wrapper;
+        }
+
+        function updateAllPreviews() {
+            elements.imagePreview.innerHTML = '';
+            state.images.forEach((img, i) => {
+                elements.imagePreview.appendChild(createPreviewElement(img, i));
+            });
+        }
+
+        function handleDragStart(e) {
+            const overlay = e.target;
+            const canvas = overlay.previousElementSibling;
+            const rect = canvas.getBoundingClientRect();
+            
+            state.isDragging = true;
+            overlay.classList.add('dragging');
+            
+            // 记录起始点击位置
+            state.dragStartPos = {
+                x: e.clientX,
+                y: e.clientY,
+                initialXPercent: state.watermarkPos.xPercent,
+                initialYPercent: state.watermarkPos.yPercent
+            };
+        }
+
+        function handleDrag(e) {
+            if (!state.isDragging) return;
+            
+            const overlay = e.target;
+            const canvas = overlay.previousElementSibling;
+            const rect = canvas.getBoundingClientRect();
+            
+            // 计算移动的像素距离
+            const deltaX = e.clientX - state.dragStartPos.x;
+            const deltaY = e.clientY - state.dragStartPos.y;
+            
+            // 转换为百分比变化
+            const percentX = (deltaX / rect.width) * 100;
+            const percentY = (deltaY / rect.height) * 100;
+            
+            // 更新位置（加上初始位置）
+            state.watermarkPos.xPercent = Math.max(0, Math.min(100, state.dragStartPos.initialXPercent + percentX));
+            state.watermarkPos.yPercent = Math.max(0, Math.min(100, state.dragStartPos.initialYPercent + percentY));
+            
+            updateAllPreviews();
+        }
+
+        function handleDragEnd(e) {
+            state.isDragging = false;
+            document.querySelectorAll('.drag-overlay').forEach(overlay => {
+                overlay.classList.remove('dragging');
+            });
         }
 
         // Event Listeners
         elements.imageInput.addEventListener('change', async (e) => {
-            state.images = await Promise.all(
-                Array.from(e.target.files).map(loadImage)
-            );
+            state.images = await Promise.all(Array.from(e.target.files).map(loadImage));
             elements.previewArea.classList.remove('hidden');
-            updatePreview();
+            updateAllPreviews();
         });
 
+        elements.imagePreview.addEventListener('mousedown', handleDragStart);
+        document.addEventListener('mousemove', handleDrag);
+        document.addEventListener('mouseup', handleDragEnd);
+
         [elements.watermarkText, elements.fontFamily, elements.fontSize]
-            .forEach(el => el.addEventListener('input', updatePreview));
+            .forEach(el => el.addEventListener('input', updateAllPreviews));
         
         document.querySelectorAll('input[name="fontWeight"]')
-            .forEach(el => el.addEventListener('change', updatePreview));
+            .forEach(el => el.addEventListener('change', updateAllPreviews));
 
         elements.fontSize.addEventListener('input', (e) => {
             elements.fontSizeValue.textContent = e.target.value;
         });
 
-        // Download functionality
         elements.downloadAll.addEventListener('click', () => {
             const zip = new JSZip();
             
