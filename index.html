@@ -1,11 +1,12 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Batch Image Watermark Tool</title>
+    <title>图片水印工具</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;700&family=Playfair+Display:wght@400;700&family=Montserrat:wght@400;700&family=Open+Sans:wght@400;700&family=Lora:wght@400;700&display=swap" rel="stylesheet">
+    <!-- 添加中文字体 -->
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;700&family=Ma+Shan+Zheng&family=ZCOOL+XiaoWei&family=ZCOOL+KuaiLe&family=ZCOOL+QingKe+HuangYou&display=swap" rel="stylesheet">
     <style>
         .canvas-wrapper {
             position: relative;
@@ -27,52 +28,52 @@
 <body class="bg-gray-50">
     <div class="max-w-3xl mx-auto p-4 space-y-4">
         <div class="space-y-2">
-            <label class="block text-sm font-medium text-gray-700">Upload Images</label>
+            <label class="block text-sm font-medium text-gray-700">选择图片</label>
             <input type="file" accept="image/*" id="imageInput" multiple
                 class="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100">
         </div>
 
         <div class="grid grid-cols-2 gap-4">
             <div class="space-y-2">
-                <label class="block text-sm font-medium text-gray-700">Watermark Text</label>
-                <input type="text" id="watermarkText" value="Watermark" 
+                <label class="block text-sm font-medium text-gray-700">水印文字</label>
+                <input type="text" id="watermarkText" value="水印" 
                     class="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm p-2">
             </div>
             <div class="space-y-2">
-                <label class="block text-sm font-medium text-gray-700">Font Family</label>
+                <label class="block text-sm font-medium text-gray-700">字体选择</label>
                 <select id="fontFamily" 
                     class="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm p-2">
-                    <option value="Roboto">Roboto</option>
-                    <option value="Playfair Display">Playfair Display</option>
-                    <option value="Montserrat">Montserrat</option>
-                    <option value="Open Sans">Open Sans</option>
-                    <option value="Lora">Lora</option>
+                    <option value="Noto Sans SC">思源黑体</option>
+                    <option value="Ma Shan Zheng">马善政毛笔字体</option>
+                    <option value="ZCOOL XiaoWei">站酷小薇字体</option>
+                    <option value="ZCOOL KuaiLe">站酷快乐体</option>
+                    <option value="ZCOOL QingKe HuangYou">站酷庆科黄油体</option>
                 </select>
             </div>
         </div>
 
         <div class="grid grid-cols-2 gap-4">
             <div class="space-y-2">
-                <label class="block text-sm font-medium text-gray-700">Position Preset</label>
+                <label class="block text-sm font-medium text-gray-700">位置预设</label>
                 <select id="positionPreset" 
                     class="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm p-2">
-                    <option value="center">Center</option>
-                    <option value="top-left">Top Left</option>
-                    <option value="top-right">Top Right</option>
-                    <option value="bottom-left">Bottom Left</option>
-                    <option value="bottom-right">Bottom Right</option>
+                    <option value="center">居中</option>
+                    <option value="top-left">左上角</option>
+                    <option value="top-right">右上角</option>
+                    <option value="bottom-left">左下角</option>
+                    <option value="bottom-right">右下角</option>
                 </select>
             </div>
             <div class="space-y-2">
-                <label class="block text-sm font-medium text-gray-700">Font Weight</label>
+                <label class="block text-sm font-medium text-gray-700">字体粗细</label>
                 <div class="flex space-x-4">
                     <label class="inline-flex items-center">
                         <input type="radio" name="fontWeight" value="normal" checked class="form-radio">
-                        <span class="ml-2">Normal</span>
+                        <span class="ml-2">常规</span>
                     </label>
                     <label class="inline-flex items-center">
                         <input type="radio" name="fontWeight" value="bold" class="form-radio">
-                        <span class="ml-2">Bold</span>
+                        <span class="ml-2">加粗</span>
                     </label>
                 </div>
             </div>
@@ -81,23 +82,23 @@
         <div class="grid grid-cols-2 gap-4">
             <div class="space-y-2">
                 <label class="block text-sm font-medium text-gray-700">
-                    Font Size: <span id="fontSizeValue">5</span>% of image height
+                    字体大小：图片高度的 <span id="fontSizeValue">5</span>%
                 </label>
                 <input type="range" id="fontSize" min="1" max="20" value="5" step="0.5" class="block w-full">
             </div>
             <div class="space-y-2">
                 <label class="block text-sm font-medium text-gray-700">
-                    Opacity: <span id="opacityValue">50</span>%
+                    透明度：<span id="opacityValue">50</span>%
                 </label>
                 <input type="range" id="opacity" min="10" max="100" value="50" class="block w-full">
             </div>
         </div>
 
         <div id="previewArea" class="hidden space-y-4">
-            <h3 class="font-medium text-lg">Preview (Drag watermark to adjust position)</h3>
+            <h3 class="font-medium text-lg">预览（拖动水印调整位置）</h3>
             <div id="imagePreview" class="grid grid-cols-2 gap-4"></div>
             <button id="downloadAll" class="w-full bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700">
-                Download All Images
+                保存所有图片
             </button>
         </div>
     </div>
@@ -115,10 +116,10 @@
         // Position presets mapping
         const POSITION_PRESETS = {  
             'center': { x: 0.5, y: 0.5 },  
-            'top-left': { x: 0.01, y: 0.01 },     // 从 0.1 改为 0.05  
-            'top-right': { x: 0.99, y: 0.01 },    // 从 0.9 改为 0.95  
-            'bottom-left': { x: 0.01, y: 0.99 },  // 从 0.1 改为 0.05  
-            'bottom-right': { x: 0.99, y: 0.99 }  // 从 0.9 改为 0.95  
+            'top-left': { x: 0.01, y: 0.01 },
+            'top-right': { x: 0.99, y: 0.01 },
+            'bottom-left': { x: 0.01, y: 0.99 },
+            'bottom-right': { x: 0.99, y: 0.99 }
         };  
 
         // DOM Elements
@@ -159,7 +160,7 @@
         function calculateWatermarkPosition(canvas, x, y) {
             const centerX = canvas.width / 2;
             const centerY = canvas.height / 2;
-            const centerThreshold = 0.1; // 10% of dimension
+            const centerThreshold = 0.1;
 
             const isCenterX = Math.abs(x - centerX) < canvas.width * centerThreshold;
             const isCenterY = Math.abs(y - centerY) < canvas.height * centerThreshold;
@@ -179,27 +180,21 @@
             canvas.width = img.width;
             canvas.height = img.height;
             
-            // Draw original image
             ctx.drawImage(img, 0, 0);
             
-            // Get watermark style
             const { opacity, weight, fontSizePercent } = getWatermarkStyle();
             const fontSize = Math.round((fontSizePercent / 100) * canvas.height);
             
-            // Set watermark style
             ctx.fillStyle = `rgba(255, 255, 255, ${opacity})`;
             ctx.font = `${weight} ${fontSize}px "${elements.fontFamily.value}"`;
             
-            // Calculate position
             const x = state.watermarkPos.x * canvas.width;
             const y = state.watermarkPos.y * canvas.height;
             const position = calculateWatermarkPosition(canvas, x, y);
             
-            // Apply text alignment
             ctx.textAlign = position.textAlign;
             ctx.textBaseline = position.textBaseline;
             
-            // Draw watermark
             ctx.fillText(elements.watermarkText.value, position.x, position.y);
             
             return canvas;
@@ -235,7 +230,6 @@
             
             const rect = state.dragStartPos.rect;
             
-            // Calculate new position
             state.watermarkPos = {
                 x: Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width)),
                 y: Math.max(0, Math.min(1, (e.clientY - rect.top) / rect.height))
@@ -288,7 +282,6 @@
         document.addEventListener('mousemove', handleDrag);
         document.addEventListener('mouseup', handleDragEnd);
 
-        // Input change handlers
         [elements.watermarkText, elements.fontFamily, elements.fontSize, elements.opacity]
             .forEach(el => el.addEventListener('input', () => {
                 if (el === elements.fontSize) {
@@ -302,24 +295,16 @@
         document.querySelectorAll('input[name="fontWeight"]')
             .forEach(el => el.addEventListener('change', updateAllPreviews));
 
-        // Download handler
+        // 修改下载处理逻辑，改为直接下载多个文件
         elements.downloadAll.addEventListener('click', () => {
-            const zip = new JSZip();
             state.images.forEach((img, i) => {
                 const canvas = createWatermarkedCanvas(img);
-                const dataUrl = canvas.toDataURL('image/png');
-                const base64Data = dataUrl.split(',')[1];
-                zip.file(`watermarked-${i + 1}.png`, base64Data, {base64: true});
-            });
-            
-            zip.generateAsync({type: 'blob'}).then(blob => {
                 const link = document.createElement('a');
-                link.href = URL.createObjectURL(blob);
-                link.download = 'watermarked-images.zip';
+                link.href = canvas.toDataURL('image/png');
+                link.download = `水印图片_${i + 1}.png`;
                 link.click();
             });
         });
     </script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 </body>
 </html>
