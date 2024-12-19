@@ -5,44 +5,35 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>图片水印工具</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <!-- 添加中文字体 -->
     <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;700&family=Ma+Shan+Zheng&family=ZCOOL+XiaoWei&family=ZCOOL+KuaiLe&family=ZCOOL+QingKe+HuangYou&display=swap" rel="stylesheet">
     <style>
-        .canvas-wrapper {
-            position: relative;
-            display: inline-block;
-        }
+        .canvas-wrapper { position: relative; }
         .drag-overlay {
             position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
             cursor: move;
         }
-        .dragging {
-            cursor: grabbing !important;
-        }
+        .dragging { cursor: grabbing !important; }
     </style>
 </head>
 <body class="bg-gray-50">
     <div class="max-w-3xl mx-auto p-4 space-y-4">
+        <h1 class="text-2xl font-bold text-center text-gray-800 mb-6">图片水印工具</h1>
+        
         <div class="space-y-2">
             <label class="block text-sm font-medium text-gray-700">选择图片</label>
-            <input type="file" accept="image/*" id="imageInput" multiple
-                class="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100">
+            <input type="file" accept="image/*" id="imageInput" multiple class="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100">
         </div>
 
         <div class="grid grid-cols-2 gap-4">
             <div class="space-y-2">
                 <label class="block text-sm font-medium text-gray-700">水印文字</label>
-                <input type="text" id="watermarkText" value="水印" 
-                    class="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm p-2">
+                <input type="text" id="watermarkText" value="水印" class="block w-full rounded-md border-gray-300 shadow-sm p-2">
             </div>
             <div class="space-y-2">
                 <label class="block text-sm font-medium text-gray-700">字体选择</label>
-                <select id="fontFamily" 
-                    class="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm p-2">
+                <select id="fontFamily" class="block w-full rounded-md border-gray-300 shadow-sm p-2">
                     <option value="Noto Sans SC">思源黑体</option>
                     <option value="Ma Shan Zheng">马善政毛笔字体</option>
                     <option value="ZCOOL XiaoWei">站酷小薇字体</option>
@@ -55,8 +46,7 @@
         <div class="grid grid-cols-2 gap-4">
             <div class="space-y-2">
                 <label class="block text-sm font-medium text-gray-700">位置预设</label>
-                <select id="positionPreset" 
-                    class="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm p-2">
+                <select id="positionPreset" class="block w-full rounded-md border-gray-300 shadow-sm p-2">
                     <option value="center">居中</option>
                     <option value="top-left">左上角</option>
                     <option value="top-right">右上角</option>
@@ -68,11 +58,11 @@
                 <label class="block text-sm font-medium text-gray-700">字体粗细</label>
                 <div class="flex space-x-4">
                     <label class="inline-flex items-center">
-                        <input type="radio" name="fontWeight" value="normal" checked class="form-radio">
+                        <input type="radio" name="fontWeight" value="normal" checked>
                         <span class="ml-2">常规</span>
                     </label>
                     <label class="inline-flex items-center">
-                        <input type="radio" name="fontWeight" value="bold" class="form-radio">
+                        <input type="radio" name="fontWeight" value="bold">
                         <span class="ml-2">加粗</span>
                     </label>
                 </div>
@@ -82,29 +72,29 @@
         <div class="grid grid-cols-2 gap-4">
             <div class="space-y-2">
                 <label class="block text-sm font-medium text-gray-700">
-                    字体大小：图片高度的 <span id="fontSizeValue">5</span>%
+                    字体大小：<span id="fontSizeValue">5</span>%
                 </label>
-                <input type="range" id="fontSize" min="1" max="20" value="5" step="0.5" class="block w-full">
+                <input type="range" id="fontSize" min="1" max="20" value="5" step="0.5" class="w-full">
             </div>
             <div class="space-y-2">
                 <label class="block text-sm font-medium text-gray-700">
                     透明度：<span id="opacityValue">50</span>%
                 </label>
-                <input type="range" id="opacity" min="10" max="100" value="50" class="block w-full">
+                <input type="range" id="opacity" min="10" max="100" value="50" class="w-full">
             </div>
         </div>
 
         <div id="previewArea" class="hidden space-y-4">
             <h3 class="font-medium text-lg">预览（拖动水印调整位置）</h3>
-            <div id="imagePreview" class="grid grid-cols-2 gap-4"></div>
+            <div id="imagePreview" class="grid gap-4"></div>
             <button id="downloadAll" class="w-full bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700">
-                保存所有图片
+                在新页面中查看所有图片
             </button>
         </div>
     </div>
 
     <script>
-        // State management
+    (() => {
         const state = {
             images: [],
             watermarkPos: { x: 0.5, y: 0.5 },
@@ -113,35 +103,33 @@
             currentCanvas: null
         };
 
-        // Position presets mapping
-        const POSITION_PRESETS = {  
-            'center': { x: 0.5, y: 0.5 },  
+        const POSITIONS = {
+            'center': { x: 0.5, y: 0.5 },
             'top-left': { x: 0.01, y: 0.01 },
             'top-right': { x: 0.99, y: 0.01 },
             'bottom-left': { x: 0.01, y: 0.99 },
             'bottom-right': { x: 0.99, y: 0.99 }
-        };  
-
-        // DOM Elements
-        const elements = {
-            imageInput: document.getElementById('imageInput'),
-            watermarkText: document.getElementById('watermarkText'),
-            fontSize: document.getElementById('fontSize'),
-            fontFamily: document.getElementById('fontFamily'),
-            opacity: document.getElementById('opacity'),
-            previewArea: document.getElementById('previewArea'),
-            imagePreview: document.getElementById('imagePreview'),
-            downloadAll: document.getElementById('downloadAll'),
-            fontSizeValue: document.getElementById('fontSizeValue'),
-            opacityValue: document.getElementById('opacityValue'),
-            positionPreset: document.getElementById('positionPreset')
         };
 
-        // Utility functions
+        const $ = id => document.getElementById(id);
+        const els = {
+            imageInput: $('imageInput'),
+            watermarkText: $('watermarkText'),
+            fontSize: $('fontSize'),
+            fontFamily: $('fontFamily'),
+            opacity: $('opacity'),
+            previewArea: $('previewArea'),
+            imagePreview: $('imagePreview'),
+            downloadAll: $('downloadAll'),
+            fontSizeValue: $('fontSizeValue'),
+            opacityValue: $('opacityValue'),
+            positionPreset: $('positionPreset')
+        };
+
         function loadImage(file) {
-            return new Promise((resolve) => {
+            return new Promise(resolve => {
                 const reader = new FileReader();
-                reader.onload = (e) => {
+                reader.onload = e => {
                     const img = new Image();
                     img.onload = () => resolve(img);
                     img.src = e.target.result;
@@ -150,161 +138,135 @@
             });
         }
 
-        function getWatermarkStyle() {
-            const opacity = parseInt(elements.opacity.value) / 100;
-            const weight = document.querySelector('input[name="fontWeight"]:checked').value;
-            const fontSizePercent = parseFloat(elements.fontSize.value);
-            return { opacity, weight, fontSizePercent };
-        }
-
-        function calculateWatermarkPosition(canvas, x, y) {
-            const centerX = canvas.width / 2;
-            const centerY = canvas.height / 2;
-            const centerThreshold = 0.1;
-
-            const isCenterX = Math.abs(x - centerX) < canvas.width * centerThreshold;
-            const isCenterY = Math.abs(y - centerY) < canvas.height * centerThreshold;
-
-            return {
-                x: x,
-                y: y,
-                textAlign: isCenterX ? 'center' : (x < centerX ? 'left' : 'right'),
-                textBaseline: isCenterY ? 'middle' : (y < centerY ? 'top' : 'bottom')
-            };
-        }
-
         function createWatermarkedCanvas(img) {
             const canvas = document.createElement('canvas');
             const ctx = canvas.getContext('2d');
-            
             canvas.width = img.width;
             canvas.height = img.height;
             
             ctx.drawImage(img, 0, 0);
             
-            const { opacity, weight, fontSizePercent } = getWatermarkStyle();
-            const fontSize = Math.round((fontSizePercent / 100) * canvas.height);
+            const opacity = els.opacity.value / 100;
+            const weight = document.querySelector('input[name="fontWeight"]:checked').value;
+            const fontSize = Math.round((els.fontSize.value / 100) * canvas.height);
             
             ctx.fillStyle = `rgba(255, 255, 255, ${opacity})`;
-            ctx.font = `${weight} ${fontSize}px "${elements.fontFamily.value}"`;
+            ctx.font = `${weight} ${fontSize}px "${els.fontFamily.value}"`;
             
             const x = state.watermarkPos.x * canvas.width;
             const y = state.watermarkPos.y * canvas.height;
-            const position = calculateWatermarkPosition(canvas, x, y);
             
-            ctx.textAlign = position.textAlign;
-            ctx.textBaseline = position.textBaseline;
+            ctx.textAlign = x < canvas.width * 0.4 ? 'left' : x > canvas.width * 0.6 ? 'right' : 'center';
+            ctx.textBaseline = y < canvas.height * 0.4 ? 'top' : y > canvas.height * 0.6 ? 'bottom' : 'middle';
             
-            ctx.fillText(elements.watermarkText.value, position.x, position.y);
-            
+            ctx.fillText(els.watermarkText.value, x, y);
             return canvas;
         }
 
-        // Event handlers
-        function handlePositionPresetChange(e) {
-            const preset = e.target.value;
-            if (preset !== 'custom' && POSITION_PRESETS[preset]) {
-                state.watermarkPos = { ...POSITION_PRESETS[preset] };
-                updateAllPreviews();
-            }
-        }
-
-        function handleDragStart(e) {
-            if (e.target.className !== 'drag-overlay') return;
-            
-            elements.positionPreset.value = 'custom';
-            const overlay = e.target;
-            const canvas = overlay.previousElementSibling;
-            
-            state.isDragging = true;
-            state.currentCanvas = canvas;
-            overlay.classList.add('dragging');
-            
-            state.dragStartPos = {
-                rect: canvas.getBoundingClientRect()
-            };
-        }
-
-        function handleDrag(e) {
-            if (!state.isDragging || !state.currentCanvas) return;
-            
-            const rect = state.dragStartPos.rect;
-            
-            state.watermarkPos = {
-                x: Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width)),
-                y: Math.max(0, Math.min(1, (e.clientY - rect.top) / rect.height))
-            };
-            
-            updateAllPreviews();
-        }
-
-        function handleDragEnd() {
-            if (!state.isDragging) return;
-            
-            state.isDragging = false;
-            state.currentCanvas = null;
-            state.dragStartPos = null;
-            
-            document.querySelectorAll('.drag-overlay').forEach(overlay => {
-                overlay.classList.remove('dragging');
-            });
-        }
-
-        function updateAllPreviews() {
-            elements.imagePreview.innerHTML = '';
+        function updatePreviews() {
+            els.imagePreview.innerHTML = '';
             state.images.forEach((img, i) => {
                 const wrapper = document.createElement('div');
                 wrapper.className = 'canvas-wrapper';
                 
                 const canvas = createWatermarkedCanvas(img);
                 canvas.className = 'w-full h-auto border rounded';
-                canvas.dataset.index = i;
                 
                 const overlay = document.createElement('div');
                 overlay.className = 'drag-overlay';
-                overlay.dataset.index = i;
                 
-                wrapper.appendChild(canvas);
-                wrapper.appendChild(overlay);
-                elements.imagePreview.appendChild(wrapper);
+                const saveBtn = document.createElement('button');
+                saveBtn.className = 'absolute bottom-2 right-2 bg-blue-600 text-white px-3 py-1 rounded-md text-sm z-10';
+                saveBtn.textContent = '保存';
+                saveBtn.onclick = e => {
+                    e.preventDefault();
+                    window.open(canvas.toDataURL('image/png'), '_blank');
+                };
+                
+                wrapper.append(canvas, overlay, saveBtn);
+                els.imagePreview.appendChild(wrapper);
             });
         }
 
-        // Event listeners
-        elements.imageInput.addEventListener('change', async (e) => {
+        // Event Listeners
+        els.imageInput.onchange = async e => {
             state.images = await Promise.all(Array.from(e.target.files).map(loadImage));
-            elements.previewArea.classList.remove('hidden');
-            updateAllPreviews();
+            els.previewArea.classList.remove('hidden');
+            updatePreviews();
+        };
+
+        els.positionPreset.onchange = e => {
+            if (POSITIONS[e.target.value]) {
+                state.watermarkPos = { ...POSITIONS[e.target.value] };
+                updatePreviews();
+            }
+        };
+
+        els.imagePreview.onmousedown = e => {
+            if (!e.target.classList.contains('drag-overlay')) return;
+            state.isDragging = true;
+            state.currentCanvas = e.target.previousElementSibling;
+            state.dragStartPos = state.currentCanvas.getBoundingClientRect();
+            els.positionPreset.value = 'custom';
+        };
+
+        document.onmousemove = e => {
+            if (!state.isDragging || !state.dragStartPos) return;
+            const rect = state.dragStartPos;
+            state.watermarkPos = {
+                x: Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width)),
+                y: Math.max(0, Math.min(1, (e.clientY - rect.top) / rect.height))
+            };
+            updatePreviews();
+        };
+
+        document.onmouseup = () => {
+            state.isDragging = false;
+            state.currentCanvas = null;
+            state.dragStartPos = null;
+        };
+
+        [els.watermarkText, els.fontFamily, els.fontSize, els.opacity].forEach(el => {
+            el.oninput = () => {
+                if (el === els.fontSize) els.fontSizeValue.textContent = el.value;
+                if (el === els.opacity) els.opacityValue.textContent = el.value;
+                updatePreviews();
+            };
         });
 
-        elements.positionPreset.addEventListener('change', handlePositionPresetChange);
-        elements.imagePreview.addEventListener('mousedown', handleDragStart);
-        document.addEventListener('mousemove', handleDrag);
-        document.addEventListener('mouseup', handleDragEnd);
+        document.querySelectorAll('input[name="fontWeight"]').forEach(el => {
+            el.onchange = updatePreviews;
+        });
 
-        [elements.watermarkText, elements.fontFamily, elements.fontSize, elements.opacity]
-            .forEach(el => el.addEventListener('input', () => {
-                if (el === elements.fontSize) {
-                    elements.fontSizeValue.textContent = el.value;
-                } else if (el === elements.opacity) {
-                    elements.opacityValue.textContent = el.value;
-                }
-                updateAllPreviews();
-            }));
-
-        document.querySelectorAll('input[name="fontWeight"]')
-            .forEach(el => el.addEventListener('change', updateAllPreviews));
-
-        // 修改下载处理逻辑，改为直接下载多个文件
-        elements.downloadAll.addEventListener('click', () => {
+        els.downloadAll.onclick = () => {
+            const win = window.open('', '_blank');
+            win.document.write(`
+                <html><head><title>水印图片</title>
+                <meta name="viewport" content="width=device-width, initial-scale=1.0">
+                <style>
+                    body { margin: 20px; font-family: sans-serif; }
+                    .img-wrap { margin-bottom: 20px; }
+                    img { max-width: 100%; height: auto; display: block; margin-bottom: 10px; }
+                    p { margin: 5px 0; color: #666; }
+                </style>
+                </head><body>
+                <h2 style="margin-bottom: 20px;">长按图片即可保存</h2>
+            `);
+            
             state.images.forEach((img, i) => {
                 const canvas = createWatermarkedCanvas(img);
-                const link = document.createElement('a');
-                link.href = canvas.toDataURL('image/png');
-                link.download = `水印图片_${i + 1}.png`;
-                link.click();
+                win.document.write(`
+                    <div class="img-wrap">
+                        <img src="${canvas.toDataURL('image/png')}" alt="水印图片${i + 1}">
+                        <p>水印图片 ${i + 1}</p>
+                    </div>
+                `);
             });
-        });
+            
+            win.document.write('</body></html>');
+            win.document.close();
+        };
+    })();
     </script>
 </body>
 </html>
