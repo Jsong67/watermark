@@ -191,115 +191,155 @@
         extractedText: $('extractedText')
     };
 
-   // 改进的扩频序列生成函数  
-    function generateSpreadSequence(text, width, height) {  
-        const hash = CryptoJS.SHA256(text).toString();  
-        const sequence = new Float32Array(width * height);  
-        let index = 0;  
+    // 生成扩频序列的函数
+    function generateSpreadSequence(text, width, height) {
+        const hash = CryptoJS.SHA256(text).toString();
+        const sequence = new Float32Array(width * height);
+        let index = 0;
         
-        // 使用更长的哈希序列来生成更随机的序列  
-        for(let i = 0; i < width * height; i++) {  
-            // 使用4位十六进制数以获得更好的精度  
-            const val = parseInt(hash.substr(index % 60, 4), 16);  
-            sequence[i] = (val / 65535) * 2 - 1; // 使用65535(FFFF)作为归一化因子  
-            index = (index + 4) % 60;  
-        }  
+        for(let i = 0; i < width * height; i++) {
+            const val = parseInt(hash.substr(index % 64, 2), 16);
+            sequence[i] = (val / 255) * 2 - 1;
+            index = (index + 2) % 64;
+        }
         
-        return sequence;  
-    }  
+        return sequence;
+    }
 
-    // 改进的添加扩频水印函数  
-    function addSpreadSpectrum(imageData, text, strength) {  
-        const sequence = generateSpreadSequence(text, imageData.width, imageData.height);  
-        const data = new Uint8ClampedArray(imageData.data);  
+    // 添加扩频水印
+    function addSpreadSpectrum(imageData, text, strength) {
+        const sequence = generateSpreadSequence(text, imageData.width, imageData.height);
+        const data = imageData.data;
         
-        for(let i = 0; i < data.length; i += 4) {  
-            // 计算亮度分量  
-            const y = 0.299 * data[i] + 0.587 * data[i+1] + 0.114 * data[i+2];  
-            // 将水印强度应用到序列值  
-            const seqVal = sequence[i/4] * strength * 25; // 增加基础强度  
+        for(let i = 0; i < data.length; i += 4) {
+            const y = 0.299 * data[i] + 0.587 * data[i+1] + 0.114 * data[i+2];
+            const seqVal = sequence[i/4] * strength;
             
-            // 分别调整RGB通道  
-            data[i] = Math.max(0, Math.min(255, data[i] + seqVal));  
-            data[i+1] = Math.max(0, Math.min(255, data[i+1] + seqVal));  
-            data[i+2] = Math.max(0, Math.min(255, data[i+2] + seqVal));  
-        }  
+            data[i] = Math.max(0, Math.min(255, data[i] + seqVal));
+            data[i+1] = Math.max(0, Math.min(255, data[i+1] + seqVal));
+            data[i+2] = Math.max(0, Math.min(255, data[i+2] + seqVal));
+        }
         
-        return new ImageData(data, imageData.width, imageData.height);  
-    }  
+        return imageData;
+    }
 
-    // 改进的提取扩频水印函数  
-    function extractSpreadSpectrum(imageData, text) {  
-        const sequence = generateSpreadSequence(text, imageData.width, imageData.height);  
-        const data = imageData.data;  
-        let correlation = 0;  
-        let totalPixels = imageData.width * imageData.height;  
+    // 提取扩频水印
+    function extractSpreadSpectrum(imageData, text) {
+        const sequence = generateSpreadSequence(text, imageData.width, imageData.height);
+        const data = imageData.data;
+        let correlation = 0;
         
-        for(let i = 0; i < data.length; i += 4) {  
-            // 计算亮度分量  
-            const y = 0.299 * data[i] + 0.587 * data[i+1] + 0.114 * data[i+2];  
-            // 计算归一化相关性  
-            correlation += (y / 255) * sequence[i/4];  
-        }  
+        for(let i = 0; i < data.length; i += 4) {
+            const y = 0.299 * data[i] + 0.587 * data[i+1] + 0.114 * data[i+2];
+            correlation += y * sequence[i/4];
+        }
         
-        // 归一化相关系数  
-        correlation = correlation / totalPixels;  
-        return Math.abs(correlation); // 返回绝对值以处理负相关  
-    }  
+        correlation /= (imageData.width * imageData.height);
+        return correlation;
+    }
 
-    // 修改createWatermarkedCanvas函数中的水印添加部分  
-    function createWatermarkedCanvas(img) {  
-        const canvas = document.createElement('canvas');  
-        const ctx = canvas.getContext('2d');  
-        canvas.width = img.width;  
-        canvas.height = img.height;  
+    function loadImage(file) {
+        return new Promise(resolve => {
+            const reader = new FileReader();
+            reader.onload = e => {
+                const img = new Image();
+                img.onload = () => resolve(img);
+                img.src = e.target.result;
+            };
+            reader.readAsDataURL(file);
+        });
+    }
+
+    function createWatermarkedCanvas(img) {
+        const canvas = document.createElement('canvas');
+        const ctx = canvas.getContext('2d');
+        canvas.width = img.width;
+        canvas.height = img.height;
         
-        ctx.drawImage(img, 0, 0);  
+        ctx.drawImage(img, 0, 0);
         
-        if(state.mode === 'add') {  
-            // 添加扩频水印  
-            const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);  
-            const watermarkedData = addSpreadSpectrum(  
-                imageData,   
-                els.watermarkText.value,   
-                state.spreadStrength / 100  
-            );  
-            ctx.putImageData(watermarkedData, 0, 0);  
+        if(state.mode === 'add') {
+            // 添加扩频水印
+            const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+            const watermarkedData = addSpreadSpectrum(
+                imageData, 
+                els.watermarkText.value, 
+                state.spreadStrength / 100
+            );
+            ctx.putImageData(watermarkedData, 0, 0);
             
-            // 添加可见水印  
-            // ... (可见水印代码保持不变)  
-        }  
+            // 添加可见水印
+            const opacity = els.opacity.value / 100;
+            const weight = document.querySelector('input[name="fontWeight"]:checked').value;
+            const fontSize = Math.round((els.fontSize.value / 100) * canvas.height);
+            
+            ctx.fillStyle = `rgba(255, 255, 255, ${opacity})`;
+            ctx.font = `${weight} ${fontSize}px "${els.fontFamily.value}"`;
+            
+            const x = state.watermarkPos.x * canvas.width;
+            const y = state.watermarkPos.y * canvas.height;
+            
+            ctx.textAlign = x < canvas.width * 0.4 ? 'left' : x > canvas.width * 0.6 ? 'right' : 'center';
+            ctx.textBaseline = y < canvas.height * 0.4 ? 'top' : y > canvas.height * 0.6 ? 'bottom' : 'middle';
+            
+            ctx.fillText(els.watermarkText.value, x, y);
+        }
         
-        return canvas;  
-    }  
+        return canvas;
+    }
 
-    // 修改updatePreviews函数中的水印提取部分  
-    function updatePreviews() {  
-        els.imagePreview.innerHTML = '';  
-        els.extractResult.classList.add('hidden');  
+    function updatePreviews() {
+        els.imagePreview.innerHTML = '';
+        els.extractResult.classList.add('hidden');
         
-        state.images.forEach((img, i) => {  
-            if(state.mode === 'extract') {  
-                const canvas = document.createElement('canvas');  
-                const ctx = canvas.getContext('2d');  
-                canvas.width = img.width;  
-                canvas.height = img.height;  
-                ctx.drawImage(img, 0, 0);  
+        state.images.forEach((img, i) => {
+            if(state.mode === 'extract') {
+                const canvas = document.createElement('canvas');
+                const ctx = canvas.getContext('2d');
+                canvas.width = img.width;
+                canvas.height = img.height;
+                ctx.drawImage(img, 0, 0);
                 
-                const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);  
-                const correlation = extractSpreadSpectrum(imageData, els.watermarkText.value);  
+                const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+                const correlation = extractSpreadSpectrum(imageData, els.watermarkText.value);
                 
-                els.extractResult.classList.remove('hidden');  
-                // 调整检测阈值  
-                els.extractedText.textContent = correlation > 0.02 ?   
-                    `检测到水印内容："${els.watermarkText.value}"（相关度：${(correlation * 100).toFixed(2)}%）` :   
-                    `未检测到水印（相关度：${(correlation * 100).toFixed(2)}%）`;  
-            }  
+                els.extractResult.classList.remove('hidden');
+                els.extractedText.textContent = correlation > 0.1 ? 
+                    `检测到水印内容："${els.watermarkText.value}"` : 
+                    "未检测到水印";
+            }
             
-            // ... (其余代码保持不变)  
-        });  
-    }  
-
+            const wrapper = document.createElement('div');
+            wrapper.className = 'canvas-wrapper';
+            
+            const canvas = createWatermarkedCanvas(img);
+            canvas.className = 'w-full h-auto border rounded';
+            
+            const overlay = document.createElement('div');
+            overlay.className = 'drag-overlay';
+            overlay.style.height = 'calc(100% - 40px)';
+            
+            const buttonContainer = document.createElement('div');
+            buttonContainer.className = 'button-container';
+            
+            const saveBtn = document.createElement('button');
+            saveBtn.className = 'save-button';
+            saveBtn.textContent = '保存';
+            saveBtn.onclick = (e) => {
+                e.stopPropagation();
+                const link = document.createElement('a');
+                link.href = canvas.toDataURL('image/png');
+                link.download = `水印图片_${i + 1}.png`;
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+            };
+            
+            buttonContainer.appendChild(saveBtn);
+            wrapper.append(canvas, overlay, buttonContainer);
+            els.imagePreview.appendChild(wrapper);
+        });
+    }
 
     // Event Listeners
     els.imageInput.onchange = async e => {
