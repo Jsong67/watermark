@@ -191,51 +191,49 @@
         extractedText: $('extractedText')
     };
 
-    // 生成扩频序列的函数
     function generateSpreadSequence(text, width, height) {
         const hash = CryptoJS.SHA256(text).toString();
         const sequence = new Float32Array(width * height);
         let index = 0;
         
         for(let i = 0; i < width * height; i++) {
-            const val = parseInt(hash.substr(index % 64, 2), 16);
-            sequence[i] = (val / 255) * 2 - 1;
-            index = (index + 2) % 64;
+            const val = parseInt(hash.substr(index % 60, 4), 16);
+            sequence[i] = (val / 65535) * 2 - 1;
+            index = (index + 4) % 60;
         }
         
         return sequence;
     }
 
-    // 添加扩频水印
     function addSpreadSpectrum(imageData, text, strength) {
         const sequence = generateSpreadSequence(text, imageData.width, imageData.height);
-        const data = imageData.data;
+        const data = new Uint8ClampedArray(imageData.data);
         
         for(let i = 0; i < data.length; i += 4) {
             const y = 0.299 * data[i] + 0.587 * data[i+1] + 0.114 * data[i+2];
-            const seqVal = sequence[i/4] * strength;
+            const seqVal = sequence[i/4] * strength * 25;
             
             data[i] = Math.max(0, Math.min(255, data[i] + seqVal));
             data[i+1] = Math.max(0, Math.min(255, data[i+1] + seqVal));
             data[i+2] = Math.max(0, Math.min(255, data[i+2] + seqVal));
         }
         
-        return imageData;
+        return new ImageData(data, imageData.width, imageData.height);
     }
 
-    // 提取扩频水印
     function extractSpreadSpectrum(imageData, text) {
         const sequence = generateSpreadSequence(text, imageData.width, imageData.height);
         const data = imageData.data;
         let correlation = 0;
+        let totalPixels = imageData.width * imageData.height;
         
         for(let i = 0; i < data.length; i += 4) {
             const y = 0.299 * data[i] + 0.587 * data[i+1] + 0.114 * data[i+2];
-            correlation += y * sequence[i/4];
+            correlation += (y / 255) * sequence[i/4];
         }
         
-        correlation /= (imageData.width * imageData.height);
-        return correlation;
+        correlation = correlation / totalPixels;
+        return Math.abs(correlation);
     }
 
     function loadImage(file) {
@@ -304,9 +302,9 @@
                 const correlation = extractSpreadSpectrum(imageData, els.watermarkText.value);
                 
                 els.extractResult.classList.remove('hidden');
-                els.extractedText.textContent = correlation > 0.1 ? 
-                    `检测到水印内容："${els.watermarkText.value}"` : 
-                    "未检测到水印";
+                els.extractedText.textContent = correlation > 0.02 ? 
+                    `检测到水印内容："${els.watermarkText.value}"（相关度：${(correlation * 100).toFixed(2)}%）` : 
+                    `未检测到水印（相关度：${(correlation * 100).toFixed(2)}%）`;
             }
             
             const wrapper = document.createElement('div');
