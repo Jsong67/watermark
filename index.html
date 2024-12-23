@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>图片批量加水印工具</title>
+    <title>图片批量加水印工具 【+7AI实验室】</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js"></script>
     <style>
@@ -28,6 +28,7 @@
             display: flex;
             align-items: center;
             justify-content: center;
+            gap: 8px;
             background: rgba(0,0,0,0.05);
         }
         .save-button {
@@ -40,12 +41,22 @@
         .save-button:hover {
             background: #4338CA;
         }
+        .extract-button {
+            padding: 4px 12px;
+            background: #10B981;
+            color: white;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+        .extract-button:hover {
+            background: #059669;
+        }
     </style>
 </head>
 <body class="bg-gray-50 min-h-screen">
     <div class="max-w-4xl mx-auto p-4 space-y-6">
         <h1 class="text-2xl font-bold text-gray-900">图片批量加水印工具</h1>
-        
+         <p class="text-right text-sm text-gray-500 mt-1">Designed by Yufan Chen & Jiaqi Song & AI</p>
         <div class="bg-white rounded-lg shadow p-6 space-y-6">
             <div>
                 <label class="block text-sm font-medium text-gray-700 mb-2">选择图片</label>
@@ -70,23 +81,6 @@
                         <option value="ZCOOL XiaoWei">站酷小薇字体</option>
                         <option value="ZCOOL KuaiLe">站酷快乐体</option>
                         <option value="ZCOOL QingKe HuangYou">站酷庆科黄油体</option>
-                    </select>
-                </div>
-            </div>
-
-            <!-- LSB水印控制面板 -->
-            <div class="grid grid-cols-2 gap-4">
-                <div class="space-y-2">
-                    <label class="block text-sm font-medium text-gray-700">
-                        LSB水印位数：<span id="lsbBitsValue">2</span>位
-                    </label>
-                    <input type="range" id="lsbBits" min="1" max="3" value="2" class="w-full">
-                </div>
-                <div class="space-y-2">
-                    <label class="block text-sm font-medium text-gray-700">水印模式</label>
-                    <select id="watermarkMode" class="block w-full rounded-md border-gray-300 shadow-sm p-2">
-                        <option value="add">添加水印</option>
-                        <option value="extract">提取水印</option>
                     </select>
                 </div>
             </div>
@@ -163,9 +157,7 @@
         watermarkPos: { x: 0.5, y: 0.5 },
         isDragging: false,
         dragStartPos: null,
-        currentCanvas: null,
-        lsbBits: 2,
-        mode: 'add'
+        currentCanvas: null
     };
 
     const POSITIONS = {
@@ -190,17 +182,15 @@
         fontSizeValue: $('fontSizeValue'),
         opacityValue: $('opacityValue'),
         positionPreset: $('positionPreset'),
-        lsbBits: $('lsbBits'),
-        lsbBitsValue: $('lsbBitsValue'),
-        watermarkMode: $('watermarkMode'),
         extractResult: $('extractResult'),
         extractedText: $('extractedText')
     };
 
     // LSB水印编码函数
-    function encodeLSB(imageData, text, bits) {
+    function encodeLSB(imageData, text) {
         const data = new Uint8ClampedArray(imageData.data);
         const binaryText = textToBinary(text);
+        const bits = 2;  // 固定使用2位LSB
         const mask = (1 << bits) - 1;
         const inverseMask = ~mask & 0xFF;
         
@@ -224,9 +214,10 @@
     }
 
     // LSB水印解码函数
-    function decodeLSB(imageData, bits) {
+    function decodeLSB(imageData) {
         const data = imageData.data;
         let textLength = 0;
+        const bits = 2;  // 固定使用2位LSB
 
         // 读取文本长度
         for(let i = 0; i < 32; i++) {
@@ -287,36 +278,47 @@
         canvas.width = img.width;
         canvas.height = img.height;
         
+        // 绘制原始图片
         ctx.drawImage(img, 0, 0);
         
-        if(state.mode === 'add') {
-            // 添加LSB水印
-            const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-            const watermarkedData = encodeLSB(
-                imageData, 
-                els.watermarkText.value,
-                state.lsbBits
-            );
-            ctx.putImageData(watermarkedData, 0, 0);
-            
-            // 添加可见水印
-            const opacity = els.opacity.value / 100;
-            const weight = document.querySelector('input[name="fontWeight"]:checked').value;
-            const fontSize = Math.round((els.fontSize.value / 100) * canvas.height);
-            
-            ctx.fillStyle = `rgba(255, 255, 255, ${opacity})`;
-            ctx.font = `${weight} ${fontSize}px "${els.fontFamily.value}"`;
-            
-            const x = state.watermarkPos.x * canvas.width;
-            const y = state.watermarkPos.y * canvas.height;
-            
-            ctx.textAlign = x < canvas.width * 0.4 ? 'left' : x > canvas.width * 0.6 ? 'right' : 'center';
-            ctx.textBaseline = y < canvas.height * 0.4 ? 'top' : y > canvas.height * 0.6 ? 'bottom' : 'middle';
-            
-            ctx.fillText(els.watermarkText.value, x, y);
-        }
+        // 添加LSB水印
+        const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+        const watermarkedData = encodeLSB(imageData, els.watermarkText.value);
+        ctx.putImageData(watermarkedData, 0, 0);
+        
+        // 添加可见水印
+        const opacity = els.opacity.value / 100;
+        const weight = document.querySelector('input[name="fontWeight"]:checked').value;
+        const fontSize = Math.round((els.fontSize.value / 100) * canvas.height);
+        
+        ctx.fillStyle = `rgba(255, 255, 255, ${opacity})`;
+        ctx.font = `${weight} ${fontSize}px "${els.fontFamily.value}"`;
+        
+        const x = state.watermarkPos.x * canvas.width;
+        const y = state.watermarkPos.y * canvas.height;
+        
+        ctx.textAlign = x < canvas.width * 0.4 ? 'left' : x > canvas.width * 0.6 ? 'right' : 'center';
+        ctx.textBaseline = y < canvas.height * 0.4 ? 'top' : y > canvas.height * 0.6 ? 'bottom' : 'middle';
+        
+        ctx.fillText(els.watermarkText.value, x, y);
         
         return canvas;
+    }
+
+    function extractWatermark(img) {
+        const canvas = document.createElement('canvas');
+        const ctx = canvas.getContext('2d');
+        canvas.width = img.width;
+        canvas.height = img.height;
+        ctx.drawImage(img, 0, 0);
+        
+        const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+        const extractedText = decodeLSB(imageData);
+        
+        els.extractResult.classList.remove('hidden');
+        els.extractedText.textContent = extractedText ? 
+            `提取到水印内容："${extractedText}"` : 
+            "未检测到水印或水印已损坏";
     }
 
     function updatePreviews() {
@@ -324,22 +326,6 @@
         els.extractResult.classList.add('hidden');
         
         state.images.forEach((img, i) => {
-            if(state.mode === 'extract') {
-                const canvas = document.createElement('canvas');
-                const ctx = canvas.getContext('2d');
-                canvas.width = img.width;
-                canvas.height = img.height;
-                ctx.drawImage(img, 0, 0);
-                
-                const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-                const extractedText = decodeLSB(imageData, state.lsbBits);
-                
-                els.extractResult.classList.remove('hidden');
-                els.extractedText.textContent = extractedText ? 
-                    `提取到水印内容："${extractedText}"` : 
-                    "未检测到水印或水印已损坏";
-            }
-            
             const wrapper = document.createElement('div');
             wrapper.className = 'canvas-wrapper';
             
@@ -365,8 +351,16 @@
                 link.click();
                 document.body.removeChild(link);
             };
+
+            const extractBtn = document.createElement('button');
+            extractBtn.className = 'extract-button';
+            extractBtn.textContent = '提取水印';
+            extractBtn.onclick = (e) => {
+                e.stopPropagation();
+                extractWatermark(img);
+            };
             
-            buttonContainer.appendChild(saveBtn);
+            buttonContainer.append(saveBtn, extractBtn);
             wrapper.append(canvas, overlay, buttonContainer);
             els.imagePreview.appendChild(wrapper);
         });
@@ -384,17 +378,6 @@
             state.watermarkPos = { ...POSITIONS[e.target.value] };
             updatePreviews();
         }
-    };
-
-    els.lsbBits.oninput = () => {
-        els.lsbBitsValue.textContent = els.lsbBits.value;
-        state.lsbBits = parseInt(els.lsbBits.value);
-        updatePreviews();
-    };
-
-    els.watermarkMode.onchange = () => {
-        state.mode = els.watermarkMode.value;
-        updatePreviews();
     };
 
     els.imagePreview.onmousedown = e => {
