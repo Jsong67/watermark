@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>图片批量加水印工具 [+7AI实验室]</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/crypto-js@4.1.1/crypto-js.min.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;700&family=Ma+Shan+Zheng&family=ZCOOL+XiaoWei&family=ZCOOL+KuaiLe&family=ZCOOL+QingKe+HuangYou&display=swap" rel="stylesheet">
     <style>
         .canvas-wrapper { 
@@ -45,6 +46,7 @@
     <div class="max-w-3xl mx-auto p-4 space-y-4">
         <h1 class="text-2xl font-bold text-center text-gray-800 mb-6">图片批量加水印工具</h1>
         <p class="text-right text-sm text-gray-500 mt-1">Designed by Yufan Chen & Jiaqi Song & AI</p>
+        
         <div class="space-y-2">
             <label class="block text-sm font-medium text-gray-700">选择图片</label>
             <input type="file" accept="image/*" id="imageInput" multiple class="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100">
@@ -63,6 +65,23 @@
                     <option value="ZCOOL XiaoWei">站酷小薇字体</option>
                     <option value="ZCOOL KuaiLe">站酷快乐体</option>
                     <option value="ZCOOL QingKe HuangYou">站酷庆科黄油体</option>
+                </select>
+            </div>
+        </div>
+
+        <!-- 添加扩频水印控制面板 -->
+        <div class="grid grid-cols-2 gap-4">
+            <div class="space-y-2">
+                <label class="block text-sm font-medium text-gray-700">
+                    扩频水印强度：<span id="spreadStrengthValue">20</span>%
+                </label>
+                <input type="range" id="spreadStrength" min="5" max="40" value="20" class="w-full">
+            </div>
+            <div class="space-y-2">
+                <label class="block text-sm font-medium text-gray-700">扩频水印模式</label>
+                <select id="spreadMode" class="block w-full rounded-md border-gray-300 shadow-sm p-2">
+                    <option value="add">添加水印</option>
+                    <option value="extract">提取水印</option>
                 </select>
             </div>
         </div>
@@ -108,6 +127,14 @@
             </div>
         </div>
 
+        <!-- 添加扩频水印提取结果显示区域 -->
+        <div id="extractResult" class="hidden">
+            <div class="bg-gray-100 p-4 rounded-md">
+                <h3 class="font-medium mb-2">扩频水印提取结果：</h3>
+                <p id="extractedText" class="text-lg font-semibold"></p>
+            </div>
+        </div>
+
         <div id="previewArea" class="hidden space-y-4">
             <h3 class="font-medium text-lg">预览（拖动水印调整位置）</h3>
             <div id="imagePreview" class="grid gap-4"></div>
@@ -121,61 +148,127 @@
             </div>
         </div>
     </div>
+</body>
+</html>
+<script>
+(() => {
+    const state = {
+        images: [],
+        watermarkPos: { x: 0.5, y: 0.5 },
+        isDragging: false,
+        dragStartPos: null,
+        currentCanvas: null,
+        spreadStrength: 20,
+        mode: 'add'
+    };
 
-    <script>
-    (() => {
-        const state = {
-            images: [],
-            watermarkPos: { x: 0.5, y: 0.5 },
-            isDragging: false,
-            dragStartPos: null,
-            currentCanvas: null
-        };
+    const POSITIONS = {
+        'center': { x: 0.5, y: 0.5 },
+        'top-left': { x: 0.01, y: 0.01 },
+        'top-right': { x: 0.99, y: 0.01 },
+        'bottom-left': { x: 0.01, y: 0.99 },
+        'bottom-right': { x: 0.99, y: 0.99 }
+    };
 
-        const POSITIONS = {
-            'center': { x: 0.5, y: 0.5 },
-            'top-left': { x: 0.01, y: 0.01 },
-            'top-right': { x: 0.99, y: 0.01 },
-            'bottom-left': { x: 0.01, y: 0.99 },
-            'bottom-right': { x: 0.99, y: 0.99 }
-        };
+    const $ = id => document.getElementById(id);
+    const els = {
+        imageInput: $('imageInput'),
+        watermarkText: $('watermarkText'),
+        fontSize: $('fontSize'),
+        fontFamily: $('fontFamily'),
+        opacity: $('opacity'),
+        previewArea: $('previewArea'),
+        imagePreview: $('imagePreview'),
+        downloadAll: $('downloadAll'),
+        saveAll: $('saveAll'),
+        fontSizeValue: $('fontSizeValue'),
+        opacityValue: $('opacityValue'),
+        positionPreset: $('positionPreset'),
+        spreadStrength: $('spreadStrength'),
+        spreadStrengthValue: $('spreadStrengthValue'),
+        spreadMode: $('spreadMode'),
+        extractResult: $('extractResult'),
+        extractedText: $('extractedText')
+    };
 
-        const $ = id => document.getElementById(id);
-        const els = {
-            imageInput: $('imageInput'),
-            watermarkText: $('watermarkText'),
-            fontSize: $('fontSize'),
-            fontFamily: $('fontFamily'),
-            opacity: $('opacity'),
-            previewArea: $('previewArea'),
-            imagePreview: $('imagePreview'),
-            downloadAll: $('downloadAll'),
-            saveAll: $('saveAll'),
-            fontSizeValue: $('fontSizeValue'),
-            opacityValue: $('opacityValue'),
-            positionPreset: $('positionPreset')
-        };
-
-        function loadImage(file) {
-            return new Promise(resolve => {
-                const reader = new FileReader();
-                reader.onload = e => {
-                    const img = new Image();
-                    img.onload = () => resolve(img);
-                    img.src = e.target.result;
-                };
-                reader.readAsDataURL(file);
-            });
+    // 生成扩频序列的函数
+    function generateSpreadSequence(text, width, height) {
+        const hash = CryptoJS.SHA256(text).toString();
+        const sequence = new Float32Array(width * height);
+        let index = 0;
+        
+        for(let i = 0; i < width * height; i++) {
+            const val = parseInt(hash.substr(index % 64, 2), 16);
+            sequence[i] = (val / 255) * 2 - 1;
+            index = (index + 2) % 64;
         }
+        
+        return sequence;
+    }
 
-        function createWatermarkedCanvas(img) {
-            const canvas = document.createElement('canvas');
-            const ctx = canvas.getContext('2d');
-            canvas.width = img.width;
-            canvas.height = img.height;
+    // 添加扩频水印
+    function addSpreadSpectrum(imageData, text, strength) {
+        const sequence = generateSpreadSequence(text, imageData.width, imageData.height);
+        const data = imageData.data;
+        
+        for(let i = 0; i < data.length; i += 4) {
+            const y = 0.299 * data[i] + 0.587 * data[i+1] + 0.114 * data[i+2];
+            const seqVal = sequence[i/4] * strength;
             
-            ctx.drawImage(img, 0, 0);
+            data[i] = Math.max(0, Math.min(255, data[i] + seqVal));
+            data[i+1] = Math.max(0, Math.min(255, data[i+1] + seqVal));
+            data[i+2] = Math.max(0, Math.min(255, data[i+2] + seqVal));
+        }
+        
+        return imageData;
+    }
+
+    // 提取扩频水印
+    function extractSpreadSpectrum(imageData, text) {
+        const sequence = generateSpreadSequence(text, imageData.width, imageData.height);
+        const data = imageData.data;
+        let correlation = 0;
+        
+        for(let i = 0; i < data.length; i += 4) {
+            const y = 0.299 * data[i] + 0.587 * data[i+1] + 0.114 * data[i+2];
+            correlation += y * sequence[i/4];
+        }
+        
+        correlation /= (imageData.width * imageData.height);
+        return correlation;
+    }
+
+    function loadImage(file) {
+        return new Promise(resolve => {
+            const reader = new FileReader();
+            reader.onload = e => {
+                const img = new Image();
+                img.onload = () => resolve(img);
+                img.src = e.target.result;
+            };
+            reader.readAsDataURL(file);
+        });
+    }
+
+    function createWatermarkedCanvas(img) {
+        const canvas = document.createElement('canvas');
+        const ctx = canvas.getContext('2d');
+        canvas.width = img.width;
+        canvas.height = img.height;
+        
+        ctx.drawImage(img, 0, 0);
+        
+        if(state.mode === 'add') {
+            // 添加扩频水印
+            const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+            const watermarkedData = addSpreadSpectrum(
+                imageData, 
+                els.watermarkText.value, 
+                state.spreadStrength / 100
+            );
+            ctx.putImageData(watermarkedData, 0, 0);
             
+            // 添加可见水印
             const opacity = els.opacity.value / 100;
             const weight = document.querySelector('input[name="fontWeight"]:checked').value;
             const fontSize = Math.round((els.fontSize.value / 100) * canvas.height);
@@ -190,139 +283,168 @@
             ctx.textBaseline = y < canvas.height * 0.4 ? 'top' : y > canvas.height * 0.6 ? 'bottom' : 'middle';
             
             ctx.fillText(els.watermarkText.value, x, y);
-            return canvas;
         }
+        
+        return canvas;
+    }
 
-        function updatePreviews() {
-            els.imagePreview.innerHTML = '';
-            state.images.forEach((img, i) => {
-                const wrapper = document.createElement('div');
-                wrapper.className = 'canvas-wrapper';
+    function updatePreviews() {
+        els.imagePreview.innerHTML = '';
+        els.extractResult.classList.add('hidden');
+        
+        state.images.forEach((img, i) => {
+            if(state.mode === 'extract') {
+                const canvas = document.createElement('canvas');
+                const ctx = canvas.getContext('2d');
+                canvas.width = img.width;
+                canvas.height = img.height;
+                ctx.drawImage(img, 0, 0);
                 
-                const canvas = createWatermarkedCanvas(img);
-                canvas.className = 'w-full h-auto border rounded';
+                const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+                const correlation = extractSpreadSpectrum(imageData, els.watermarkText.value);
                 
-                const overlay = document.createElement('div');
-                overlay.className = 'drag-overlay';
-                overlay.style.height = 'calc(100% - 40px)';
-                
-                const buttonContainer = document.createElement('div');
-                buttonContainer.className = 'button-container';
-                
-                const saveBtn = document.createElement('button');
-                saveBtn.className = 'save-button';
-                saveBtn.textContent = '保存';
-                saveBtn.onclick = (e) => {
-                    e.stopPropagation();
-                    const link = document.createElement('a');
-                    link.href = canvas.toDataURL('image/png');
-                    link.download = `水印图片_${i + 1}.png`;
-                    document.body.appendChild(link);
-                    link.click();
-                    document.body.removeChild(link);
-                };
-                
-                buttonContainer.appendChild(saveBtn);
-                wrapper.append(canvas, overlay, buttonContainer);
-                els.imagePreview.appendChild(wrapper);
-            });
-        }
-
-        // Event Listeners
-        els.imageInput.onchange = async e => {
-            state.images = await Promise.all(Array.from(e.target.files).map(loadImage));
-            els.previewArea.classList.remove('hidden');
-            updatePreviews();
-        };
-
-        els.positionPreset.onchange = e => {
-            if (POSITIONS[e.target.value]) {
-                state.watermarkPos = { ...POSITIONS[e.target.value] };
-                updatePreviews();
+                els.extractResult.classList.remove('hidden');
+                els.extractedText.textContent = correlation > 0.1 ? 
+                    `检测到水印内容："${els.watermarkText.value}"` : 
+                    "未检测到水印";
             }
-        };
-
-        els.imagePreview.onmousedown = e => {
-            if (!e.target.classList.contains('drag-overlay')) return;
-            e.preventDefault();
-            state.isDragging = true;
-            state.currentCanvas = e.target.previousElementSibling;
-            state.dragStartPos = state.currentCanvas.getBoundingClientRect();
-            els.positionPreset.value = 'custom';
-        };
-
-        document.onmousemove = e => {
-            if (!state.isDragging || !state.dragStartPos) return;
-            const rect = state.dragStartPos;
-            state.watermarkPos = {
-                x: Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width)),
-                y: Math.max(0, Math.min(1, (e.clientY - rect.top) / rect.height))
-            };
-            updatePreviews();
-        };
-
-        document.onmouseup = () => {
-            state.isDragging = false;
-            state.currentCanvas = null;
-            state.dragStartPos = null;
-        };
-
-        [els.watermarkText, els.fontFamily, els.fontSize, els.opacity].forEach(el => {
-            el.oninput = () => {
-                if (el === els.fontSize) els.fontSizeValue.textContent = el.value;
-                if (el === els.opacity) els.opacityValue.textContent = el.value;
-                updatePreviews();
-            };
-        });
-
-        document.querySelectorAll('input[name="fontWeight"]').forEach(el => {
-            el.onchange = updatePreviews;
-        });
-
-        els.downloadAll.onclick = () => {
-            const win = window.open('', '_blank');
-            win.document.write(`
-                <html><head><title>水印图片预览</title>
-                <meta name="viewport" content="width=device-width, initial-scale=1.0">
-                <style>
-                    body { margin: 20px; font-family: sans-serif; }
-                    .img-wrap { margin-bottom: 20px; }
-                    img { max-width: 100%; height: auto; display: block; margin-bottom: 10px; }
-                    p { margin: 5px 0; color: #666; }
-                </style>
-                </head><body>
-                <h2 style="margin-bottom: 20px;">长按图片即可保存</h2>
-            `);
             
-            state.images.forEach((img, i) => {
-                const canvas = createWatermarkedCanvas(img);
-                win.document.write(`
-                    <div class="img-wrap">
-                        <img src="${canvas.toDataURL('image/png')}" alt="水印图片${i + 1}">
-                        <p>水印图片 ${i + 1}</p>
-                    </div>
-                `);
-            });
+            const wrapper = document.createElement('div');
+            wrapper.className = 'canvas-wrapper';
             
-            win.document.write('</body></html>');
-            win.document.close();
-        };
-
-        els.saveAll.onclick = () => {
-            state.images.forEach((img, i) => {
-                const canvas = createWatermarkedCanvas(img);
+            const canvas = createWatermarkedCanvas(img);
+            canvas.className = 'w-full h-auto border rounded';
+            
+            const overlay = document.createElement('div');
+            overlay.className = 'drag-overlay';
+            overlay.style.height = 'calc(100% - 40px)';
+            
+            const buttonContainer = document.createElement('div');
+            buttonContainer.className = 'button-container';
+            
+            const saveBtn = document.createElement('button');
+            saveBtn.className = 'save-button';
+            saveBtn.textContent = '保存';
+            saveBtn.onclick = (e) => {
+                e.stopPropagation();
                 const link = document.createElement('a');
                 link.href = canvas.toDataURL('image/png');
                 link.download = `水印图片_${i + 1}.png`;
                 document.body.appendChild(link);
                 link.click();
                 document.body.removeChild(link);
-                if (i < state.images.length - 1) {
-                    setTimeout(() => {}, 100);
-                }
-            });
+            };
+            
+            buttonContainer.appendChild(saveBtn);
+            wrapper.append(canvas, overlay, buttonContainer);
+            els.imagePreview.appendChild(wrapper);
+        });
+    }
+
+    // Event Listeners
+    els.imageInput.onchange = async e => {
+        state.images = await Promise.all(Array.from(e.target.files).map(loadImage));
+        els.previewArea.classList.remove('hidden');
+        updatePreviews();
+    };
+
+    els.positionPreset.onchange = e => {
+        if (POSITIONS[e.target.value]) {
+            state.watermarkPos = { ...POSITIONS[e.target.value] };
+            updatePreviews();
+        }
+    };
+
+    els.spreadStrength.oninput = () => {
+        els.spreadStrengthValue.textContent = els.spreadStrength.value;
+        state.spreadStrength = parseInt(els.spreadStrength.value);
+        updatePreviews();
+    };
+
+    els.spreadMode.onchange = () => {
+        state.mode = els.spreadMode.value;
+        updatePreviews();
+    };
+
+    els.imagePreview.onmousedown = e => {
+        if (!e.target.classList.contains('drag-overlay')) return;
+        e.preventDefault();
+        state.isDragging = true;
+        state.currentCanvas = e.target.previousElementSibling;
+        state.dragStartPos = state.currentCanvas.getBoundingClientRect();
+        els.positionPreset.value = 'custom';
+    };
+
+    document.onmousemove = e => {
+        if (!state.isDragging || !state.dragStartPos) return;
+        const rect = state.dragStartPos;
+        state.watermarkPos = {
+            x: Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width)),
+            y: Math.max(0, Math.min(1, (e.clientY - rect.top) / rect.height))
         };
-    })();
-    </script>
-</body>
-</html>
+        updatePreviews();
+    };
+
+    document.onmouseup = () => {
+        state.isDragging = false;
+        state.currentCanvas = null;
+        state.dragStartPos = null;
+    };
+
+    [els.watermarkText, els.fontFamily, els.fontSize, els.opacity].forEach(el => {
+        el.oninput = () => {
+            if (el === els.fontSize) els.fontSizeValue.textContent = el.value;
+            if (el === els.opacity) els.opacityValue.textContent = el.value;
+            updatePreviews();
+        };
+    });
+
+    document.querySelectorAll('input[name="fontWeight"]').forEach(el => {
+        el.onchange = updatePreviews;
+    });
+
+    els.downloadAll.onclick = () => {
+        const win = window.open('', '_blank');
+        win.document.write(`
+            <html><head><title>水印图片预览</title>
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+            <style>
+                body { margin: 20px; font-family: sans-serif; }
+                .img-wrap { margin-bottom: 20px; }
+                img { max-width: 100%; height: auto; display: block; margin-bottom: 10px; }
+                p { margin: 5px 0; color: #666; }
+            </style>
+            </head><body>
+            <h2 style="margin-bottom: 20px;">长按图片即可保存</h2>
+        `);
+        
+        state.images.forEach((img, i) => {
+            const canvas = createWatermarkedCanvas(img);
+            win.document.write(`
+                <div class="img-wrap">
+                    <img src="${canvas.toDataURL('image/png')}" alt="水印图片${i + 1}">
+                    <p>水印图片 ${i + 1}</p>
+                </div>
+            `);
+        });
+        
+        win.document.write('</body></html>');
+        win.document.close();
+    };
+
+    els.saveAll.onclick = () => {
+        state.images.forEach((img, i) => {
+            const canvas = createWatermarkedCanvas(img);
+            const link = document.createElement('a');
+            link.href = canvas.toDataURL('image/png');
+            link.download = `水印图片_${i + 1}.png`;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            if (i < state.images.length - 1) {
+                setTimeout(() => {}, 100);
+            }
+        });
+    };
+})();
+</script>
