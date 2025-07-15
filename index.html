@@ -199,6 +199,28 @@
             z-index: 3000;
             font-size: 16px;
         }
+        .progress-bar {
+            width: 100%;
+            height: 20px;
+            background: #f0f0f0;
+            border-radius: 10px;
+            overflow: hidden;
+            margin: 15px 0;
+        }
+        .progress-fill {
+            height: 100%;
+            background: #4caf50;
+            transition: width 0.3s ease;
+        }
+        .batch-download-instruction {
+            background: #e3f2fd;
+            color: #1976d2;
+            padding: 15px;
+            border-radius: 8px;
+            margin: 15px 0;
+            font-size: 14px;
+            line-height: 1.5;
+        }
     </style>
 </head>
 <body class="bg-gray-50 min-h-screen">
@@ -335,8 +357,8 @@
         <div class="batch-download-box">
             <h3 style="margin-bottom: 20px; color: #333;">📱 选择保存方式</h3>
             <div id="downloadOptions">
-                <button id="combinedImageBtn" class="download-option-btn primary">
-                    🖼️ 生成拼图版 (推荐)
+                <button id="smartBatchBtn" class="download-option-btn primary">
+                    🚀 智能批量下载
                 </button>
                 <button id="manualDownloadBtn" class="download-option-btn">
                     👆 逐个手动保存
@@ -347,6 +369,20 @@
                 <button id="zipDownloadBtn" class="download-option-btn secondary">
                     📦 下载ZIP压缩包
                 </button>
+            </div>
+            <div class="batch-download-instruction">
+                <strong>💡 智能批量下载说明：</strong><br>
+                1. 点击后会弹出第一张图片的下载<br>
+                2. 请点击"下载"确认保存<br>
+                3. 之后会自动依次下载其余图片<br>
+                4. 无需重复点击确认
+            </div>
+            <div id="downloadProgress" class="hidden">
+                <div class="progress-bar">
+                    <div id="progressFill" class="progress-fill" style="width: 0%"></div>
+                </div>
+                <div id="progressText">等待用户确认第一张图片...</div>
+                <button id="stopDownload" class="close-btn" style="background: #f44336;">停止下载</button>
             </div>
             <button id="closeModal" class="close-btn" style="background: #666;">关闭</button>
         </div>
@@ -373,7 +409,11 @@
         isDragging: false,
         dragStartPos: null,
         currentCanvas: null,
-        currentCopyIndex: 0
+        currentCopyIndex: 0,
+        batchDownloadInProgress: false,
+        batchDownloadStopped: false,
+        downloadQueue: [],
+        downloadIndex: 0
     };
 
     const POSITIONS = {
@@ -412,12 +452,16 @@
         downloadProgressSimple: $('downloadProgressSimple'),
         saveAllText: $('saveAllText'),
         batchDownloadModal: $('batchDownloadModal'),
-        combinedImageBtn: $('combinedImageBtn'),
+        smartBatchBtn: $('smartBatchBtn'),
         manualDownloadBtn: $('manualDownloadBtn'),
         copyImageBtn: $('copyImageBtn'),
         zipDownloadBtn: $('zipDownloadBtn'),
         closeModal: $('closeModal'),
         downloadOptions: $('downloadOptions'),
+        downloadProgress: $('downloadProgress'),
+        progressFill: $('progressFill'),
+        progressText: $('progressText'),
+        stopDownload: $('stopDownload'),
         copySuccess: $('copySuccess')
     };
 
@@ -685,131 +729,145 @@
         document.body.removeChild(link);
     }
 
-    // 生成拼图版本（推荐方案）
-    function createCombinedImage() {
+    // 智能批量下载
+    async function startSmartBatchDownload() {
         if (state.images.length === 0) return;
         
-        els.downloadProgressSimple.classList.remove('hidden');
-        els.downloadProgressSimple.querySelector('.mb-2').textContent = '正在生成拼图版...';
+        state.batchDownloadInProgress = true;
+        state.batchDownloadStopped = false;
+        state.downloadIndex = 0;
         
+        // 准备下载队列
+        state.downloadQueue = state.images.map((img, index) => ({
+            canvas: createWatermarkedCanvas(img),
+            index: index + 1
+        }));
+        
+        els.downloadOptions.classList.add('hidden');
+        els.downloadProgress.classList.remove('hidden');
+        
+        // 下载第一张图片
+        await downloadNextImage();
+        
+        // 监听窗口焦点变化来检测用户是否确认了下载
+        if (state.downloadQueue.length > 1) {
+            startDownloadMonitoring();
+        }
+    }
+
+    // 下载下一张图片
+    async function downloadNextImage() {
+        if (state.downloadIndex >= state.downloadQueue.length || state.batchDownloadStopped) {
+            completeBatchDownload();
+            return;
+        }
+        
+        const item = state.downloadQueue[state.downloadIndex];
+        
+        // 更新进度
+        const progress = (state.downloadIndex / state.downloadQueue.length) * 100;
+        els.progressFill.style.width = progress + '%';
+        
+        if (state.downloadIndex === 0) {
+            els.progressText.textContent = '等待用户确认第一张图片下载...';
+        } else {
+            els.progressText.textContent = `正在下载第 ${state.downloadIndex + 1} 张图片...`;
+        }
+        
+        // 创建下载链接
+        const link = document.createElement('a');
+        link.href = item.canvas.toDataURL('image/png');
+        link.download = `水印图片_${item.index}.png`;
+        link.style.display = 'none';
+        document.body.appendChild(link);
+        
+        // 触发下载
+        link.click();
+        document.body.removeChild(link);
+        
+        state.downloadIndex++;
+    }
+
+    // 监听下载进度
+    function startDownloadMonitoring() {
+        let checkCount = 0;
+        const maxChecks = 300; // 最多检查5分钟
+        
+        const checkInterval = setInterval(() => {
+            checkCount++;
+            
+            if (state.batchDownloadStopped || checkCount > maxChecks) {
+                clearInterval(checkInterval);
+                return;
+            }
+            
+            // 如果第一张图片已经下载完成，开始后续下载
+            if (state.downloadIndex === 1) {
+                els.progressText.textContent = '检测到用户确认，开始批量下载...';
+                clearInterval(checkInterval);
+                continueDownload();
+            }
+        }, 1000);
+        
+        // 也可以监听窗口焦点事件
+        const handleFocus = () => {
+            if (state.downloadIndex === 1 && !state.batchDownloadStopped) {
+                els.progressText.textContent = '检测到用户确认，开始批量下载...';
+                setTimeout(() => {
+                    if (!state.batchDownloadStopped) {
+                        continueDownload();
+                    }
+                }, 1000);
+                window.removeEventListener('focus', handleFocus);
+            }
+        };
+        
+        window.addEventListener('focus', handleFocus);
+        
+        // 5秒后如果没有检测到用户确认，也开始下载
         setTimeout(() => {
-            const canvases = state.images.map(img => createWatermarkedCanvas(img));
+            if (state.downloadIndex === 1 && !state.batchDownloadStopped) {
+                els.progressText.textContent = '自动开始批量下载...';
+                continueDownload();
+                window.removeEventListener('focus', handleFocus);
+            }
+        }, 5000);
+    }
+
+    // 继续下载剩余图片
+    async function continueDownload() {
+        const downloadInterval = setInterval(async () => {
+            if (state.downloadIndex >= state.downloadQueue.length || state.batchDownloadStopped) {
+                clearInterval(downloadInterval);
+                completeBatchDownload();
+                return;
+            }
             
-            // 计算网格布局
-            const cols = Math.ceil(Math.sqrt(canvases.length));
-            const rows = Math.ceil(canvases.length / cols);
-            
-            // 找出最大的图片尺寸
-            let maxWidth = 0;
-            let maxHeight = 0;
-            canvases.forEach(canvas => {
-                maxWidth = Math.max(maxWidth, canvas.width);
-                maxHeight = Math.max(maxHeight, canvas.height);
-            });
-            
-            // 设置合适的单元格尺寸
-            const cellWidth = Math.min(maxWidth, 800);
-            const cellHeight = Math.min(maxHeight, 600);
-            
-            // 创建大画布
-            const combinedCanvas = document.createElement('canvas');
-            const ctx = combinedCanvas.getContext('2d');
-            combinedCanvas.width = cols * cellWidth;
-            combinedCanvas.height = rows * cellHeight;
-            
-            // 白色背景
-            ctx.fillStyle = 'white';
-            ctx.fillRect(0, 0, combinedCanvas.width, combinedCanvas.height);
-            
-            // 绘制每个图片
-            canvases.forEach((canvas, i) => {
-                const col = i % cols;
-                const row = Math.floor(i / cols);
-                
-                const x = col * cellWidth;
-                const y = row * cellHeight;
-                
-                // 计算缩放比例
-                const scaleX = cellWidth / canvas.width;
-                const scaleY = cellHeight / canvas.height;
-                const scale = Math.min(scaleX, scaleY, 1);
-                
-                const scaledWidth = canvas.width * scale;
-                const scaledHeight = canvas.height * scale;
-                
-                // 居中绘制
-                const drawX = x + (cellWidth - scaledWidth) / 2;
-                const drawY = y + (cellHeight - scaledHeight) / 2;
-                
-                ctx.drawImage(canvas, drawX, drawY, scaledWidth, scaledHeight);
-                
-                // 添加边框
-                ctx.strokeStyle = '#ddd';
-                ctx.lineWidth = 1;
-                ctx.strokeRect(x, y, cellWidth, cellHeight);
-                
-                // 添加序号
-                ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
-                ctx.font = '16px Arial';
-                ctx.textAlign = 'left';
-                ctx.textBaseline = 'top';
-                ctx.fillText(`${i + 1}`, x + 5, y + 5);
-            });
-            
-            els.downloadProgressSimple.classList.add('hidden');
-            
-            // 在新窗口显示
-            const newWindow = window.open('', '_blank');
-            newWindow.document.write(`
-                <html>
-                    <head>
-                        <title>拼图版水印图片</title>
-                        <meta name="viewport" content="width=device-width, initial-scale=1.0">
-                        <style>
-                            body { 
-                                margin: 0; 
-                                padding: 20px; 
-                                background: #f5f5f5; 
-                                text-align: center;
-                                font-family: Arial, sans-serif;
-                            }
-                            .container {
-                                background: white;
-                                padding: 20px;
-                                border-radius: 10px;
-                                box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-                                margin-bottom: 20px;
-                            }
-                            img { 
-                                max-width: 100%; 
-                                height: auto; 
-                                border-radius: 8px;
-                                box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-                            }
-                            .tip { 
-                                color: #666; 
-                                font-size: 14px; 
-                                margin-bottom: 15px;
-                                line-height: 1.5;
-                            }
-                        </style>
-                    </head>
-                    <body>
-                        <div class="container">
-                            <h2>拼图版水印图片</h2>
-                            <div class="tip">
-                                📱 手机端：长按图片选择"保存到相册"<br>
-                                💻 电脑端：右键图片选择"另存为"<br>
-                                共 ${state.images.length} 张图片，按序号排列
-                            </div>
-                            <img src="${combinedCanvas.toDataURL('image/png')}" alt="拼图版水印图片">
-                        </div>
-                    </body>
-                </html>
-            `);
-            
+            await downloadNextImage();
+        }, 800); // 每800ms下载一张
+    }
+
+    // 完成批量下载
+    function completeBatchDownload() {
+        if (!state.batchDownloadStopped) {
+            els.progressText.textContent = `✅ 已完成 ${state.downloadQueue.length} 张图片的下载！`;
+            els.progressFill.style.width = '100%';
+            setTimeout(() => {
+                closeBatchDownloadModal();
+            }, 2000);
+        }
+        
+        state.batchDownloadInProgress = false;
+    }
+
+    // 停止批量下载
+    function stopBatchDownload() {
+        state.batchDownloadStopped = true;
+        state.batchDownloadInProgress = false;
+        els.progressText.textContent = '❌ 下载已停止';
+        setTimeout(() => {
             closeBatchDownloadModal();
-        }, 100);
+        }, 1000);
     }
 
     // 复制图片到剪贴板
@@ -1024,15 +1082,21 @@
     // 显示批量下载选择窗口
     function showBatchDownloadModal() {
         els.batchDownloadModal.classList.remove('hidden');
-        // 重置复制按钮状态
+        // 重置状态
         els.copyImageBtn.textContent = '📋 复制图片到剪贴板';
         els.copyImageBtn.disabled = false;
         state.currentCopyIndex = 0;
+        state.batchDownloadInProgress = false;
+        state.batchDownloadStopped = false;
     }
 
     // 关闭批量下载选择窗口
     function closeBatchDownloadModal() {
         els.batchDownloadModal.classList.add('hidden');
+        els.downloadOptions.classList.remove('hidden');
+        els.downloadProgress.classList.add('hidden');
+        state.batchDownloadInProgress = false;
+        state.batchDownloadStopped = false;
     }
 
     // Event Listeners
@@ -1172,11 +1236,12 @@
     els.downloadZip.onclick = downloadAsZip;
 
     // 批量下载模态框事件
-    els.combinedImageBtn.onclick = createCombinedImage;
+    els.smartBatchBtn.onclick = startSmartBatchDownload;
     els.manualDownloadBtn.onclick = createManualDownloadPage;
     els.copyImageBtn.onclick = copyImageToClipboard;
     els.zipDownloadBtn.onclick = downloadAsZip;
     els.closeModal.onclick = closeBatchDownloadModal;
+    els.stopDownload.onclick = stopBatchDownload;
 
     // 点击模态框外部关闭
     els.batchDownloadModal.onclick = (e) => {
