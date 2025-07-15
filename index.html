@@ -1,218 +1,212 @@
-<!DOCTYPE html>  
-<html>  
-<head>  
-    <meta charset="UTF-8">  
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">  
-    <title>图片批量加水印工具【+7AI实验室】</title>  
-    <script src="https://cdn.tailwindcss.com"></script>  
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>  
-    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;700&family=Ma+Shan+Zheng&family=ZCOOL+XiaoWei&family=ZCOOL+KuaiLe&family=ZCOOL+QingKe+HuangYou&display=swap">  
-    <style>  
-        .canvas-wrapper {  
-            position: relative;  
-            margin-bottom: 1rem;  
-        }  
-        .drag-overlay {  
-            position: absolute;  
-            top: 0;  
-            left: 0;  
-            right: 0;  
-            bottom: 40px;  
-            cursor: move;  
-        }  
-        .button-container {  
-            position: absolute;  
-            bottom: 0;  
-            left: 0;  
-            right: 0;  
-            height: 40px;  
-            display: flex;  
-            align-items: center;  
-            justify-content: center;  
-            gap: 8px;  
-            background: rgba(0,0,0,0.05);  
-        }  
-        .save-button {  
-            padding: 4px 12px;  
-            background: #4F46E5;  
-            color: white;  
-            border-radius: 4px;  
-            font-size: 14px;  
-        }  
-        .save-button:hover {  
-            background: #4338CA;  
-        }  
-        .extract-button {  
-            padding: 4px 12px;  
-            background: #10B981;  
-            color: white;  
-            border-radius: 4px;  
-            font-size: 14px;  
-        }  
-        .extract-button:hover {  
-            background: #059669;  
-        }  
-        .font-msz {  
-            font-family: 'Ma Shan Zheng', cursive;  
-        }  
-        .font-xw {  
-            font-family: 'ZCOOL XiaoWei', cursive;  
-        }  
-        .font-kl {  
-            font-family: 'ZCOOL KuaiLe', cursive;  
-        }  
-        .font-qkhy {  
-            font-family: 'ZCOOL QingKe HuangYou', cursive;  
-        }  
-        .font-noto {  
-            font-family: 'Noto Sans SC', sans-serif;  
-        }  
-        .banner-container {  
-            width: 100%;  
-            margin: 0 auto;  
-            padding: 1rem 0;  
-            text-align: center;  
-            background-color: #ffffff;  
-            max-width: 56rem;  
-        }  
-        .banner-image {  
-            width: 100%;  
-            height: auto;  
-            margin: 0 auto;  
-            display: block;  
-        }  
-        .fullscreen-disabled {  
-            opacity: 0.5;  
-            pointer-events: none;  
-        }  
-        .download-progress {  
-            position: fixed;  
-            top: 50%;  
-            left: 50%;  
-            transform: translate(-50%, -50%);  
-            background: rgba(0, 0, 0, 0.8);  
-            color: white;  
-            padding: 20px;  
-            border-radius: 8px;  
-            z-index: 1000;  
-            text-align: center;  
-            min-width: 200px;  
-        }  
-        .batch-download-container {  
-            position: fixed;  
-            top: 0;  
-            left: 0;  
-            width: 100%;  
-            height: 100%;  
-            background: rgba(0, 0, 0, 0.8);  
-            z-index: 2000;  
-            display: flex;  
-            align-items: center;  
-            justify-content: center;  
-        }  
-        .batch-download-box {  
-            background: white;  
-            padding: 30px;  
-            border-radius: 15px;  
-            max-width: 90%;  
-            width: 400px;  
-            text-align: center;  
-        }  
-        .auto-download-btn {  
-            background: #ff6b6b;  
-            color: white;  
-            border: none;  
-            padding: 15px 30px;  
-            border-radius: 8px;  
-            font-size: 16px;  
-            font-weight: bold;  
-            cursor: pointer;  
-            width: 100%;  
-            margin: 10px 0;  
-        }  
-        .auto-download-btn:hover {  
-            background: #ff5252;  
-        }  
-        .manual-download-btn {  
-            background: #4ecdc4;  
-            color: white;  
-            border: none;  
-            padding: 15px 30px;  
-            border-radius: 8px;  
-            font-size: 16px;  
-            font-weight: bold;  
-            cursor: pointer;  
-            width: 100%;  
-            margin: 10px 0;  
-        }  
-        .manual-download-btn:hover {  
-            background: #26a69a;  
-        }  
-        .close-btn {  
-            background: #gray;  
-            color: white;  
-            border: none;  
-            padding: 10px 20px;  
-            border-radius: 8px;  
-            cursor: pointer;  
-            margin-top: 10px;  
-        }  
-        .progress-bar {  
-            width: 100%;  
-            height: 20px;  
-            background: #f0f0f0;  
-            border-radius: 10px;  
-            overflow: hidden;  
-            margin: 15px 0;  
-        }  
-        .progress-fill {  
-            height: 100%;  
-            background: #4caf50;  
-            transition: width 0.3s ease;  
-        }  
-        .hidden-download-area {  
-            position: fixed;  
-            top: -1000px;  
-            left: -1000px;  
-            width: 1px;  
-            height: 1px;  
-            opacity: 0;  
-            pointer-events: none;  
-        }  
-        .file-input-container {  
-            position: relative;  
-            display: inline-block;  
-            width: 100%;  
-        }  
-        .file-input-buttons {  
-            display: flex;  
-            gap: 10px;  
-            margin-top: 10px;  
-        }  
-        .file-input-btn {  
-            flex: 1;  
-            padding: 10px;  
-            background: #f8f9fa;  
-            border: 1px solid #dee2e6;  
-            border-radius: 6px;  
-            cursor: pointer;  
-            text-align: center;  
-            font-size: 14px;  
-            transition: all 0.2s;  
-        }  
-        .file-input-btn:hover {  
-            background: #e9ecef;  
-            border-color: #adb5bd;  
-        }  
-        .file-input-btn.active {  
-            background: #e3f2fd;  
-            border-color: #2196f3;  
-            color: #1976d2;  
-        }  
-    </style>  
-</head>  
-<body class="bg-gray-50 min-h-screen">  
-    <!-- Banner -->  
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>图片批量加水印工具【+7AI实验室】</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;700&family=Ma+Shan+Zheng&family=ZCOOL+XiaoWei&family=ZCOOL+KuaiLe&family=ZCOOL+QingKe+HuangYou&display=swap">
+    <style>
+        .canvas-wrapper {
+            position: relative;
+            margin-bottom: 1rem;
+        }
+        .drag-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 40px;
+            cursor: move;
+        }
+        .button-container {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            height: 40px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            background: rgba(0,0,0,0.05);
+        }
+        .save-button {
+            padding: 4px 12px;
+            background: #4F46E5;
+            color: white;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+        .save-button:hover {
+            background: #4338CA;
+        }
+        .extract-button {
+            padding: 4px 12px;
+            background: #10B981;
+            color: white;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+        .extract-button:hover {
+            background: #059669;
+        }
+        .font-msz {
+            font-family: 'Ma Shan Zheng', cursive;
+        }
+        .font-xw {
+            font-family: 'ZCOOL XiaoWei', cursive;
+        }
+        .font-kl {
+            font-family: 'ZCOOL KuaiLe', cursive;
+        }
+        .font-qkhy {
+            font-family: 'ZCOOL QingKe HuangYou', cursive;
+        }
+        .font-noto {
+            font-family: 'Noto Sans SC', sans-serif;
+        }
+        .banner-container {
+            width: 100%;
+            margin: 0 auto;
+            padding: 1rem 0;
+            text-align: center;
+            background-color: #ffffff;
+            max-width: 56rem;
+        }
+        .banner-image {
+            width: 100%;
+            height: auto;
+            margin: 0 auto;
+            display: block;
+        }
+        .fullscreen-disabled {
+            opacity: 0.5;
+            pointer-events: none;
+        }
+        .download-progress {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(0, 0, 0, 0.8);
+            color: white;
+            padding: 20px;
+            border-radius: 8px;
+            z-index: 1000;
+            text-align: center;
+            min-width: 200px;
+        }
+        .batch-download-container {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.8);
+            z-index: 2000;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .batch-download-box {
+            background: white;
+            padding: 30px;
+            border-radius: 15px;
+            max-width: 90%;
+            width: 400px;
+            text-align: center;
+        }
+        .auto-download-btn {
+            background: #ff6b6b;
+            color: white;
+            border: none;
+            padding: 15px 30px;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: bold;
+            cursor: pointer;
+            width: 100%;
+            margin: 10px 0;
+        }
+        .auto-download-btn:hover {
+            background: #ff5252;
+        }
+        .manual-download-btn {
+            background: #4ecdc4;
+            color: white;
+            border: none;
+            padding: 15px 30px;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: bold;
+            cursor: pointer;
+            width: 100%;
+            margin: 10px 0;
+        }
+        .manual-download-btn:hover {
+            background: #26a69a;
+        }
+        .close-btn {
+            background: #gray;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 8px;
+            cursor: pointer;
+            margin-top: 10px;
+        }
+        .progress-bar {
+            width: 100%;
+            height: 20px;
+            background: #f0f0f0;
+            border-radius: 10px;
+            overflow: hidden;
+            margin: 15px 0;
+        }
+        .progress-fill {
+            height: 100%;
+            background: #4caf50;
+            transition: width 0.3s ease;
+        }
+        .image-input-options {
+            display: flex;
+            gap: 8px;
+            margin-top: 8px;
+            flex-wrap: wrap;
+        }
+        .image-input-option {
+            flex: 1;
+            min-width: 80px;
+            padding: 6px 12px;
+            background: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 4px;
+            cursor: pointer;
+            text-align: center;
+            font-size: 12px;
+            transition: all 0.2s;
+            color: #6c757d;
+        }
+        .image-input-option:hover {
+            background: #e9ecef;
+            border-color: #adb5bd;
+        }
+        .image-input-option:active {
+            background: #dee2e6;
+        }
+        .hidden-input {
+            position: absolute;
+            width: 0;
+            height: 0;
+            opacity: 0;
+            pointer-events: none;
+        }
+    </style>
+</head>
+<body class="bg-gray-50 min-h-screen">
+    <!-- Banner -->
     <div class="max-w-4xl mx-auto">  
         <div class="banner-container">  
             <img src="https://i.ibb.co/NYByV7m/plus7banner.png"   
@@ -221,126 +215,919 @@
         </div>  
     </div>  
 
-    <div class="max-w-4xl mx-auto p-4 space-y-6">  
-        <h1 class="text-2xl font-bold text-gray-900 text-center">图片批量加水印工具</h1>  
-        <p class="text-right text-sm text-gray-500 mt-1">Designed by Yufan Chen & Jiaqi Song & AI</p>  
-        <div class="bg-white rounded-lg shadow p-6 space-y-6">  
-            <div>  
-                <label class="block text-sm font-medium text-gray-700 mb-2">选择图片</label>  
-                <div class="file-input-container">  
-                    <!-- 主要文件输入（相册） -->  
-                    <input type="file" id="imageInputGallery" multiple accept="image/*" class="block w-full text-sm text-gray-500  
-                        file:mr-4 file:py-2 file:px-4  
-                        file:rounded-md file:border-0  
-                        file:text-sm file:font-semibold  
-                        file:bg-indigo-50 file:text-indigo-700  
-                        hover:file:bg-indigo-100" style="display: none;">  
-                    
-                    <!-- 相机输入 -->  
-                    <input type="file" id="imageInputCamera" multiple accept="image/*" capture="environment" class="block w-full text-sm text-gray-500  
-                        file:mr-4 file:py-2 file:px-4  
-                        file:rounded-md file:border-0  
-                        file:text-sm file:font-semibold  
-                        file:bg-indigo-50 file:text-indigo-700  
-                        hover:file:bg-indigo-100" style="display: none;">  
-                    
-                    <!-- 文件输入 -->  
-                    <input type="file" id="imageInputFile" multiple accept="image/*" class="block w-full text-sm text-gray-500  
-                        file:mr-4 file:py-2 file:px-4  
-                        file:rounded-md file:border-0  
-                        file:text-sm file:font-semibold  
-                        file:bg-indigo-50 file:text-indigo-700  
-                        hover:file:bg-indigo-100" style="display: none;">  
-                    
-                    <!-- 显示的按钮 -->  
-                    <div class="file-input-buttons">  
-                        <div class="file-input-btn active" id="btnGallery">  
-                            📱 相册  
-                        </div>  
-                        <div class="file-input-btn" id="btnCamera">  
-                            📷 相机  
-                        </div>  
-                        <div class="file-input-btn" id="btnFile">  
-                            📁 文件  
-                        </div>  
-                    </div>  
-                </div>  
-            </div>  
+    <div class="max-w-4xl mx-auto p-4 space-y-6">
+        <h1 class="text-2xl font-bold text-gray-900 text-center">图片批量加水印工具</h1>
+        <p class="text-right text-sm text-gray-500 mt-1">Designed by Yufan Chen & Jiaqi Song & AI</p>
+        <div class="bg-white rounded-lg shadow p-6 space-y-6">
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-2">选择图片</label>
+                <!-- 主要的文件输入框，默认打开相册 -->
+                <input type="file" id="imageInput" multiple accept="image/*" class="block w-full text-sm text-gray-500
+                    file:mr-4 file:py-2 file:px-4
+                    file:rounded-md file:border-0
+                    file:text-sm file:font-semibold
+                    file:bg-indigo-50 file:text-indigo-700
+                    hover:file:bg-indigo-100">
+                
+                <!-- 额外的输入选项 -->
+                <div class="image-input-options">
+                    <div class="image-input-option" id="optionCamera">📷 相机拍照</div>
+                    <div class="image-input-option" id="optionFiles">📁 文件管理</div>
+                </div>
+                
+                <!-- 隐藏的输入框 -->
+                <input type="file" id="cameraInput" multiple accept="image/*" capture="environment" class="hidden-input">
+                <input type="file" id="fileInput" multiple accept="image/*,*/*" class="hidden-input">
+            </div>
 
-            <div class="grid grid-cols-2 gap-4">  
-                <div class="space-y-2">  
-                    <label class="block text-sm font-medium text-gray-700">水印文字</label>  
-                    <input type="text" id="watermarkText" value="+7AI实验室" class="block w-full rounded-md border-gray-300 shadow-sm p-2">  
-                </div>  
-                <div class="space-y-2">  
-                    <label class="block text-sm font-medium text-gray-700">字体选择</label>  
-                    <select id="fontFamily" class="block w-full rounded-md border-gray-300 shadow-sm p-2">  
-                        <option value="Noto Sans SC" class="font-noto">思源黑体</option>  
-                        <option value="Ma Shan Zheng" class="font-msz">马善政毛笔字体</option>  
-                        <option value="ZCOOL XiaoWei" class="font-xw">站酷小薇字体</option>  
-                        <option value="ZCOOL KuaiLe" class="font-kl">站酷快乐体</option>  
-                        <option value="ZCOOL QingKe HuangYou" class="font-qkhy">站酷庆科黄油体</option>  
-                    </select>  
-                </div>  
-            </div>  
+            <div class="grid grid-cols-2 gap-4">
+                <div class="space-y-2">
+                    <label class="block text-sm font-medium text-gray-700">水印文字</label>
+                    <input type="text" id="watermarkText" value="+7AI实验室" class="block w-full rounded-md border-gray-300 shadow-sm p-2">
+                </div>
+                <div class="space-y-2">
+                    <label class="block text-sm font-medium text-gray-700">字体选择</label>
+                    <select id="fontFamily" class="block w-full rounded-md border-gray-300 shadow-sm p-2">
+                        <option value="Noto Sans SC" class="font-noto">思源黑体</option>
+                        <option value="Ma Shan Zheng" class="font-msz">马善政毛笔字体</option>
+                        <option value="ZCOOL XiaoWei" class="font-xw">站酷小薇字体</option>
+                        <option value="ZCOOL KuaiLe" class="font-kl">站酷快乐体</option>
+                        <option value="ZCOOL QingKe HuangYou" class="font-qkhy">站酷庆科黄油体</option>
+                    </select>
+                </div>
+            </div>
 
-            <div class="grid grid-cols-2 gap-4">  
-                <div class="space-y-2">  
-                    <label class="block text-sm font-medium text-gray-700">水印模式</label>  
-                    <div class="flex items-center space-x-4">  
-                        <label class="inline-flex items-center">  
-                            <input type="checkbox" id="fullscreenWatermark" class="rounded border-gray-300 text-indigo-600 shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50">  
-                            <span class="ml-2 text-sm">全屏水印</span>  
-                        </label>  
-                    </div>  
-                </div>  
-                <div class="space-y-2" id="positionContainer">  
-                    <label class="block text-sm font-medium text-gray-700">位置预设</label>  
-                    <select id="positionPreset" class="block w-full rounded-md border-gray-300 shadow-sm p-2">  
-                        <option value="center">居中</option>  
-                        <option value="top-left">左上角</option>  
-                        <option value="top-right">右上角</option>  
-                        <option value="bottom-left">左下角</option>  
-                        <option value="bottom-right">右下角</option>  
-                    </select>  
-                </div>  
-            </div>  
+            <div class="grid grid-cols-2 gap-4">
+                <div class="space-y-2">
+                    <label class="block text-sm font-medium text-gray-700">水印模式</label>
+                    <div class="flex items-center space-x-4">
+                        <label class="inline-flex items-center">
+                            <input type="checkbox" id="fullscreenWatermark" class="rounded border-gray-300 text-indigo-600 shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50">
+                            <span class="ml-2 text-sm">全屏水印</span>
+                        </label>
+                    </div>
+                </div>
+                <div class="space-y-2" id="positionContainer">
+                    <label class="block text-sm font-medium text-gray-700">位置预设</label>
+                    <select id="positionPreset" class="block w-full rounded-md border-gray-300 shadow-sm p-2">
+                        <option value="center">居中</option>
+                        <option value="top-left">左上角</option>
+                        <option value="top-right">右上角</option>
+                        <option value="bottom-left">左下角</option>
+                        <option value="bottom-right">右下角</option>
+                    </select>
+                </div>
+            </div>
 
-            <div class="grid grid-cols-2 gap-4">  
-                <div class="space-y-2">  
-                    <label class="block text-sm font-medium text-gray-700">字体粗细</label>  
-                    <div class="flex space-x-4">  
-                        <label class="inline-flex items-center">  
-                            <input type="radio" name="fontWeight" value="normal" checked>  
-                            <span class="ml-2">常规</span>  
-                        </label>  
-                        <label class="inline-flex items-center">  
-                            <input type="radio" name="fontWeight" value="bold">  
-                            <span class="ml-2">加粗</span>  
-                        </label>  
-                    </div>  
-                </div>  
-                <div class="space-y-2">  
-                    <label class="block text-sm font-medium text-gray-700">  
-                        字体大小：<span id="fontSizeValue">5</span>%  
-                    </label>  
-                    <input type="range" id="fontSize" min="1" max="20" value="5" step="0.5" class="w-full">  
-                </div>  
-            </div>  
+            <div class="grid grid-cols-2 gap-4">
+                <div class="space-y-2">
+                    <label class="block text-sm font-medium text-gray-700">字体粗细</label>
+                    <div class="flex space-x-4">
+                        <label class="inline-flex items-center">
+                            <input type="radio" name="fontWeight" value="normal" checked>
+                            <span class="ml-2">常规</span>
+                        </label>
+                        <label class="inline-flex items-center">
+                            <input type="radio" name="fontWeight" value="bold">
+                            <span class="ml-2">加粗</span>
+                        </label>
+                    </div>
+                </div>
+                <div class="space-y-2">
+                    <label class="block text-sm font-medium text-gray-700">
+                        字体大小：<span id="fontSizeValue">5</span>%
+                    </label>
+                    <input type="range" id="fontSize" min="1" max="20" value="5" step="0.5" class="w-full">
+                </div>
+            </div>
 
-            <div class="grid grid-cols-2 gap-4">  
-                <div class="space-y-2">  
-                    <label class="block text-sm font-medium text-gray-700">  
-                        可见水印透明度：<span id="opacityValue">50</span>%  
-                    </label>  
-                    <input type="range" id="opacity" min="10" max="100" value="50" class="w-full">  
-                </div>  
-                <div class="space-y-2" id="spacingContainer">  
-                    <label class="block text-sm font-medium text-gray-700">  
-                        水印间距：<span id="spacingValue">150</span>px  
-                    </label>  
-                    <input type="range" id="spacing" min="80" max="300" value="150" class="w-full">  
-                </div>  
-            </div>  
+            <div class="grid grid-cols-2 gap-4">
+                <div class="space-y-2">
+                    <label class="block text-sm font-medium text-gray-700">
+                        可见水印透明度：<span id="opacityValue">50</span>%
+                    </label>
+                    <input type="range" id="opacity" min="10" max="100" value="50" class="w-full">
+                </div>
+                <div class="space-y-2" id="spacingContainer">
+                    <label class="block text-sm font-medium text-gray-700">
+                        水印间距：<span id="spacingValue">150</span>px
+                    </label>
+                    <input type="range" id="spacing" min="80" max="300" value="150" class="w-full">
+                </div>
+            </div>
 
             <div id="previewArea" class="hidden space-y-4">
+                <h3 class="font-medium text-lg">预览（<span id="dragHint">拖动可调整可见水印位置</span>）</h3>
+                <div id="imagePreview" class="grid gap-4"></div>
+                <div class="flex flex-col gap-2 md:flex-row md:gap-4">
+                    <button id="downloadAll" class="flex-1 bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700">
+                        在新页面中查看
+                    </button>
+                    <button id="saveAll" class="flex-1 bg-green-600 text-white py-2 px-4 rounded-md hover:bg-green-700">
+                        <span id="saveAllText">批量保存图片</span>
+                    </button>
+                    <button id="downloadZip" class="flex-1 bg-purple-600 text-white py-2 px-4 rounded-md hover:bg-purple-700">
+                        打包下载ZIP
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 批量下载选择窗口 -->
+    <div id="batchDownloadModal" class="batch-download-container hidden">
+        <div class="batch-download-box">
+            <h3 style="margin-bottom: 20px; color: #333;">📱 选择保存方式</h3>
+            <div id="downloadOptions">
+                <button id="silentDownloadBtn" class="auto-download-btn">
+                    🚀 静默批量下载
+                </button>
+                <button id="manualDownloadBtn" class="manual-download-btn">
+                    👆 手动逐个保存
+                </button>
+                <button id="zipDownloadBtn" class="manual-download-btn" style="background: #9c27b0;">
+                    📦 下载ZIP压缩包
+                </button>
+            </div>
+            <div id="downloadProgress" class="hidden">
+                <div class="progress-bar">
+                    <div id="progressFill" class="progress-fill" style="width: 0%"></div>
+                </div>
+                <div id="progressText">准备下载...</div>
+                <button id="stopDownload" class="close-btn" style="background: #f44336;">停止下载</button>
+            </div>
+            <button id="closeModal" class="close-btn" style="background: #666;">关闭</button>
+        </div>
+    </div>
+
+    <!-- 简单下载进度提示 -->
+    <div id="downloadProgressSimple" class="download-progress hidden">
+        <div class="mb-2">正在准备下载...</div>
+        <div class="text-sm opacity-75">请稍候</div>
+    </div>
+</body>
+</html>
+
+<script>
+(() => {
+    const state = {
+        images: [],
+        watermarkPos: { x: 0.5, y: 0.5 },
+        isDragging: false,
+        dragStartPos: null,
+        currentCanvas: null,
+        isDownloading: false,
+        downloadingStopped: false
+    };
+
+    const POSITIONS = {
+        'center': { x: 0.5, y: 0.5 },
+        'top-left': { x: 0.01, y: 0.01 },
+        'top-right': { x: 0.99, y: 0.01 },
+        'bottom-left': { x: 0.01, y: 0.99 },
+        'bottom-right': { x: 0.99, y: 0.99 }
+    };
+
+    const $ = id => document.getElementById(id);
+    const els = {
+        imageInput: $('imageInput'),
+        cameraInput: $('cameraInput'),
+        fileInput: $('fileInput'),
+        optionCamera: $('optionCamera'),
+        optionFiles: $('optionFiles'),
+        watermarkText: $('watermarkText'),
+        fontSize: $('fontSize'),
+        fontFamily: $('fontFamily'),
+        opacity: $('opacity'),
+        spacing: $('spacing'),
+        previewArea: $('previewArea'),
+        imagePreview: $('imagePreview'),
+        downloadAll: $('downloadAll'),
+        saveAll: $('saveAll'),
+        downloadZip: $('downloadZip'),
+        fontSizeValue: $('fontSizeValue'),
+        opacityValue: $('opacityValue'),
+        spacingValue: $('spacingValue'),
+        positionPreset: $('positionPreset'),
+        fullscreenWatermark: $('fullscreenWatermark'),
+        positionContainer: $('positionContainer'),
+        spacingContainer: $('spacingContainer'),
+        dragHint: $('dragHint'),
+        downloadProgressSimple: $('downloadProgressSimple'),
+        saveAllText: $('saveAllText'),
+        batchDownloadModal: $('batchDownloadModal'),
+        silentDownloadBtn: $('silentDownloadBtn'),
+        manualDownloadBtn: $('manualDownloadBtn'),
+        zipDownloadBtn: $('zipDownloadBtn'),
+        closeModal: $('closeModal'),
+        downloadProgress: $('downloadProgress'),
+        progressFill: $('progressFill'),
+        progressText: $('progressText'),
+        stopDownload: $('stopDownload'),
+        downloadOptions: $('downloadOptions')
+    };
+
+    // 检测是否为移动设备
+    function isMobile() {
+        return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+    }
+
+    // LSB水印编码函数
+    function encodeLSB(imageData, text) {
+        const data = new Uint8ClampedArray(imageData.data);
+        const binaryText = textToBinary(text);
+        const bits = 2;
+        const mask = (1 << bits) - 1;
+        const inverseMask = ~mask & 0xFF;
+        
+        const textLength = binaryText.length;
+        for(let i = 0; i < 32; i++) {
+            const lengthBit = (textLength >> i) & 1;
+            data[i * 4] = (data[i * 4] & inverseMask) | lengthBit;
+        }
+
+        for(let i = 0; i < binaryText.length; i++) {
+            const pixelIndex = (i + 32) * 4;
+            if(pixelIndex >= data.length) break;
+            
+            const textBits = parseInt(binaryText.substr(i * bits, bits) || '0', 2);
+            data[pixelIndex] = (data[pixelIndex] & inverseMask) | textBits;
+        }
+
+        return new ImageData(data, imageData.width, imageData.height);
+    }
+
+    // LSB水印解码函数
+    function decodeLSB(imageData) {
+        const data = imageData.data;
+        let textLength = 0;
+        const bits = 2;
+
+        for(let i = 0; i < 32; i++) {
+            const lengthBit = data[i * 4] & 1;
+            textLength |= (lengthBit << i);
+        }
+
+        let binaryText = '';
+        const mask = (1 << bits) - 1;
+        
+        for(let i = 0; i < textLength; i++) {
+            const pixelIndex = (i + 32) * 4;
+            if(pixelIndex >= data.length) break;
+            
+            const textBits = data[pixelIndex] & mask;
+            binaryText += textBits.toString(2).padStart(bits, '0');
+        }
+
+        return binaryToText(binaryText);
+    }
+
+    function textToBinary(text) {
+        let binary = '';
+        for(let i = 0; i < text.length; i++) {
+            binary += text.charCodeAt(i).toString(2).padStart(16, '0');
+        }
+        return binary;
+    }
+
+    function binaryToText(binary) {
+        let text = '';
+        for(let i = 0; i < binary.length; i += 16) {
+            const charCode = parseInt(binary.substr(i, 16), 2);
+            if(charCode === 0) break;
+            text += String.fromCharCode(charCode);
+        }
+        return text;
+    }
+
+    function loadImage(file) {
+        return new Promise(resolve => {
+            const reader = new FileReader();
+            reader.onload = e => {
+                const img = new Image();
+                img.onload = () => resolve(img);
+                img.src = e.target.result;
+            };
+            reader.readAsDataURL(file);
+        });
+    }
+
+    // 优化后的全屏水印绘制函数
+    function drawFullscreenWatermark(ctx, canvas, text, fontSize, opacity, weight, fontFamily) {
+        const spacing = parseInt(els.spacing.value);
+        
+        ctx.fillStyle = `rgba(255, 255, 255, ${opacity})`;
+        ctx.font = `${weight} ${fontSize}px ${fontFamily}`;
+        
+        // 计算文本尺寸
+        const textMetrics = ctx.measureText(text);
+        const textWidth = textMetrics.width;
+        const textHeight = fontSize;
+        
+        // 计算间距（确保合理的最小间距）
+        const stepX = Math.max(textWidth + spacing, 100);
+        const stepY = Math.max(textHeight + spacing, 60);
+        
+        // 保存当前状态
+        ctx.save();
+        
+        // 设置旋转角度（-45度，更自然的水印效果）
+        const angle = -Math.PI / 4;
+        
+        // 移动到画布中心并旋转
+        ctx.translate(canvas.width / 2, canvas.height / 2);
+        ctx.rotate(angle);
+        
+        // 计算旋转后需要覆盖的区域大小
+        const diagonal = Math.sqrt(canvas.width * canvas.width + canvas.height * canvas.height);
+        const coverSize = diagonal * 1.2;
+        
+        // 计算行列数（限制最大数量以防止性能问题）
+        const maxCols = Math.min(Math.ceil(coverSize / stepX), 20);
+        const maxRows = Math.min(Math.ceil(coverSize / stepY), 20);
+        
+        // 计算起始位置（居中绘制）
+        const startX = -(maxCols * stepX) / 2;
+        const startY = -(maxRows * stepY) / 2;
+        
+        // 绘制水印网格
+        for(let row = 0; row < maxRows; row++) {
+            for(let col = 0; col < maxCols; col++) {
+                const x = startX + col * stepX;
+                const y = startY + row * stepY;
+                ctx.fillText(text, x, y);
+            }
+        }
+        
+        // 恢复状态
+        ctx.restore();
+    }
+
+    function createWatermarkedCanvas(img) {
+        const canvas = document.createElement('canvas');
+        const ctx = canvas.getContext('2d');
+        canvas.width = img.width;
+        canvas.height = img.height;
+        
+        // 绘制原始图片
+        ctx.drawImage(img, 0, 0);
+        
+        // 添加LSB水印
+        const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+        const watermarkedData = encodeLSB(imageData, els.watermarkText.value);
+        ctx.putImageData(watermarkedData, 0, 0);
+        
+        // 添加可见水印
+        const opacity = els.opacity.value / 100;
+        const weight = document.querySelector('input[name="fontWeight"]:checked').value;
+        const fontSize = Math.round((els.fontSize.value / 100) * canvas.height);
+        const text = els.watermarkText.value;
+        const fontFamily = els.fontFamily.value;
+        
+        if (els.fullscreenWatermark.checked) {
+            // 全屏水印
+            drawFullscreenWatermark(ctx, canvas, text, fontSize, opacity, weight, fontFamily);
+        } else {
+            // 单个水印
+            ctx.fillStyle = `rgba(255, 255, 255, ${opacity})`;
+            ctx.font = `${weight} ${fontSize}px ${fontFamily}`;
+            
+            const x = state.watermarkPos.x * canvas.width;
+            const y = state.watermarkPos.y * canvas.height;
+            
+            ctx.textAlign = x < canvas.width * 0.4 ? 'left' : x > canvas.width * 0.6 ? 'right' : 'center';
+            ctx.textBaseline = y < canvas.height * 0.4 ? 'top' : y > canvas.height * 0.6 ? 'bottom' : 'middle';
+            
+            ctx.fillText(text, x, y);
+        }
+        
+        return canvas;
+    }
+
+    function extractWatermark(img, resultContainer) {
+        const canvas = document.createElement('canvas');
+        const ctx = canvas.getContext('2d');
+        canvas.width = img.width;
+        canvas.height = img.height;
+        ctx.drawImage(img, 0, 0);
+        
+        const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+        const extractedText = decodeLSB(imageData);
+        
+        resultContainer.classList.remove('hidden');
+        resultContainer.innerHTML = extractedText ? 
+            `<div class="bg-green-50 border border-green-200 rounded-md p-4 mt-2">
+                <p class="text-green-800">提取到水印内容：<span class="font-semibold">"${extractedText}"</span></p>
+            </div>` : 
+            `<div class="bg-red-50 border border-red-200 rounded-md p-4 mt-2">
+                <p class="text-red-800">未检测到水印或水印已损坏</p>
+            </div>`;
+    }
+
+    function updateUIState() {
+        const isFullscreen = els.fullscreenWatermark.checked;
+        
+        // 控制位置相关控件的可用性
+        els.positionContainer.classList.toggle('fullscreen-disabled', isFullscreen);
+        els.spacingContainer.classList.toggle('hidden', !isFullscreen);
+        
+        // 更新拖拽提示
+        els.dragHint.textContent = isFullscreen ? '全屏水印模式' : '拖动可调整可见水印位置';
+        
+        // 禁用/启用拖拽功能
+        const overlays = document.querySelectorAll('.drag-overlay');
+        overlays.forEach(overlay => {
+            overlay.style.pointerEvents = isFullscreen ? 'none' : 'auto';
+        });
+    }
+
+    function updatePreviews() {
+        els.imagePreview.innerHTML = '';
+        
+        state.images.forEach((img, i) => {
+            const container = document.createElement('div');
+            container.className = 'space-y-2';
+            
+            const wrapper = document.createElement('div');
+            wrapper.className = 'canvas-wrapper';
+            
+            const canvas = createWatermarkedCanvas(img);
+            canvas.className = 'w-full h-auto border rounded';
+            
+            const overlay = document.createElement('div');
+            overlay.className = 'drag-overlay';
+            overlay.style.height = 'calc(100% - 40px)';
+            overlay.style.pointerEvents = els.fullscreenWatermark.checked ? 'none' : 'auto';
+            
+            const buttonContainer = document.createElement('div');
+            buttonContainer.className = 'button-container';
+            
+            const saveBtn = document.createElement('button');
+            saveBtn.className = 'save-button';
+            saveBtn.textContent = '保存';
+            saveBtn.onclick = (e) => {
+                e.stopPropagation();
+                downloadSingleImage(canvas, i + 1);
+            };
+
+            const extractBtn = document.createElement('button');
+            extractBtn.className = 'extract-button';
+            extractBtn.textContent = '提取水印';
+            
+            const resultContainer = document.createElement('div');
+            resultContainer.className = 'hidden';
+            
+            extractBtn.onclick = (e) => {
+                e.stopPropagation();
+                extractWatermark(img, resultContainer);
+            };
+            
+            buttonContainer.append(saveBtn, extractBtn);
+            wrapper.append(canvas, overlay, buttonContainer);
+            container.append(wrapper, resultContainer);
+            els.imagePreview.appendChild(container);
+        });
+    }
+
+    // 处理文件选择
+    function handleFileSelect(files) {
+        Promise.all(Array.from(files).map(loadImage)).then(images => {
+            state.images = images;
+            els.previewArea.classList.remove('hidden');
+            updateUIState();
+            updatePreviews();
+        });
+    }
+
+    // 下载单个图片
+    function downloadSingleImage(canvas, index) {
+        const link = document.createElement('a');
+        link.href = canvas.toDataURL('image/png');
+        link.download = `水印图片_${index}.png`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    }
+
+    // 静默批量下载（使用更高级的技术）
+    async function attemptSilentBatchDownload() {
+        if (state.images.length === 0) return;
+        
+        state.isDownloading = true;
+        state.downloadingStopped = false;
+        
+        els.downloadOptions.classList.add('hidden');
+        els.downloadProgress.classList.remove('hidden');
+        
+        const total = state.images.length;
+        let completed = 0;
+        
+        try {
+            // 使用更现代的方法
+            if ('showSaveFilePicker' in window) {
+                // 支持 File System Access API 的现代浏览器
+                for (let i = 0; i < state.images.length; i++) {
+                    if (state.downloadingStopped) break;
+                    
+                    const canvas = createWatermarkedCanvas(state.images[i]);
+                    const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/png'));
+                    
+                    try {
+                        const fileHandle = await window.showSaveFilePicker({
+                            suggestedName: `水印图片_${i + 1}.png`,
+                            types: [{
+                                description: 'PNG图片',
+                                accept: { 'image/png': ['.png'] }
+                            }]
+                        });
+                        
+                        const writable = await fileHandle.createWritable();
+                        await writable.write(blob);
+                        await writable.close();
+                        
+                        completed++;
+                        els.progressText.textContent = `已保存第 ${completed} 张图片`;
+                        els.progressFill.style.width = (completed / total) * 100 + '%';
+                        
+                    } catch (err) {
+                        if (err.name !== 'AbortError') {
+                            console.error('保存失败:', err);
+                        }
+                        break;
+                    }
+                }
+            } else {
+                // 降级到传统方法
+                for (let i = 0; i < state.images.length; i++) {
+                    if (state.downloadingStopped) break;
+                    
+                    const canvas = createWatermarkedCanvas(state.images[i]);
+                    els.progressText.textContent = `正在准备第 ${i + 1} 张图片...`;
+                    
+                    // 创建下载链接
+                    const link = document.createElement('a');
+                    link.href = canvas.toDataURL('image/png');
+                    link.download = `水印图片_${i + 1}.png`;
+                    link.style.display = 'none';
+                    document.body.appendChild(link);
+                    link.click();
+                    document.body.removeChild(link);
+                    
+                    completed++;
+                    els.progressFill.style.width = (completed / total) * 100 + '%';
+                    
+                    // 适当延迟
+                    await new Promise(resolve => setTimeout(resolve, 100));
+                }
+            }
+        } catch (error) {
+            console.error('批量下载失败:', error);
+        }
+        
+        if (!state.downloadingStopped) {
+            els.progressText.textContent = `✅ 已完成 ${completed} 张图片！`;
+            setTimeout(() => closeBatchDownloadModal(), 2000);
+        }
+        
+        state.isDownloading = false;
+    }
+
+    // 创建手动保存页面
+    function createManualDownloadPage() {
+        if (state.images.length === 0) return;
+        
+        const newWindow = window.open('', '_blank');
+        const totalImages = state.images.length;
+        
+        newWindow.document.write(`
+            <html>
+                <head>
+                    <title>批量保存图片</title>
+                    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+                    <style>
+                        body { 
+                            margin: 0; 
+                            padding: 20px; 
+                            background: #f5f5f5; 
+                            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+                        }
+                        .header {
+                            background: white;
+                            padding: 20px;
+                            border-radius: 15px;
+                            margin-bottom: 20px;
+                            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+                            text-align: center;
+                        }
+                        .instruction {
+                            background: #e3f2fd;
+                            color: #1976d2;
+                            padding: 15px;
+                            border-radius: 10px;
+                            margin: 15px 0;
+                            font-size: 14px;
+                            line-height: 1.5;
+                        }
+                        .image-container {
+                            background: white;
+                            padding: 20px;
+                            border-radius: 15px;
+                            margin-bottom: 20px;
+                            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+                        }
+                        .image-container img {
+                            width: 100%;
+                            height: auto;
+                            border-radius: 10px;
+                            margin-bottom: 15px;
+                        }
+                        .image-info {
+                            display: flex;
+                            justify-content: space-between;
+                            align-items: center;
+                            color: #666;
+                            font-size: 14px;
+                            margin-bottom: 10px;
+                        }
+                        .save-hint {
+                            background: #fff3cd;
+                            color: #856404;
+                            padding: 12px;
+                            border-radius: 8px;
+                            font-size: 13px;
+                            text-align: center;
+                            border: 1px solid #ffeaa7;
+                        }
+                        .close-btn {
+                            position: fixed;
+                            bottom: 20px;
+                            right: 20px;
+                            background: #2196f3;
+                            color: white;
+                            border: none;
+                            border-radius: 50%;
+                            width: 56px;
+                            height: 56px;
+                            font-size: 24px;
+                            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+                            cursor: pointer;
+                            z-index: 1000;
+                        }
+                        .close-btn:hover {
+                            background: #1976d2;
+                        }
+                    </style>
+                </head>
+                <body>
+                    <div class="header">
+                        <h2 style="margin: 0 0 10px 0; color: #333;">📱 手动保存图片</h2>
+                        <div class="instruction">
+                            <strong>💡 保存方法：</strong><br>
+                            1. ✋ 长按图片<br>
+                            2. 📋 选择"保存图片"或"保存到相册"<br>
+                            3. 🔄 逐个保存所有图片
+                        </div>
+                    </div>
+                    <div id="images-container"></div>
+                    <button class="close-btn" onclick="window.close()">✕</button>
+                </body>
+            </html>
+        `);
+        
+        const imagesContainer = newWindow.document.getElementById('images-container');
+        
+        // 逐个生成图片
+        state.images.forEach((img, i) => {
+            const canvas = createWatermarkedCanvas(img);
+            const dataUrl = canvas.toDataURL('image/png');
+            
+            const imageContainer = newWindow.document.createElement('div');
+            imageContainer.className = 'image-container';
+            imageContainer.innerHTML = `
+                <div class="image-info">
+                    <span style="font-weight: bold; color: #333;">图片 ${i + 1}</span>
+                    <span>尺寸: ${img.width}×${img.height}</span>
+                </div>
+                <img src="${dataUrl}" alt="水印图片${i + 1}">
+                <div class="save-hint">
+                    👆 长按上方图片保存
+                </div>
+            `;
+            
+            imagesContainer.appendChild(imageContainer);
+        });
+        
+        closeBatchDownloadModal();
+    }
+
+    // 批量下载为ZIP
+    async function downloadAsZip() {
+        if (state.images.length === 0) return;
+        
+        els.downloadProgressSimple.classList.remove('hidden');
+        
+        try {
+            const zip = new JSZip();
+            
+            for (let i = 0; i < state.images.length; i++) {
+                const canvas = createWatermarkedCanvas(state.images[i]);
+                const dataUrl = canvas.toDataURL('image/png');
+                const base64Data = dataUrl.split(',')[1];
+                zip.file(`水印图片_${i + 1}.png`, base64Data, { base64: true });
+            }
+            
+            const content = await zip.generateAsync({ type: 'blob' });
+            
+            const link = document.createElement('a');
+            link.href = URL.createObjectURL(content);
+            link.download = `水印图片_${new Date().toISOString().slice(0, 10)}.zip`;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            
+            URL.revokeObjectURL(link.href);
+            
+        } catch (error) {
+            console.error('ZIP生成失败:', error);
+            alert('ZIP文件生成失败，请重试');
+        } finally {
+            els.downloadProgressSimple.classList.add('hidden');
+        }
+        
+        closeBatchDownloadModal();
+    }
+
+    // 显示批量下载选择窗口
+    function showBatchDownloadModal() {
+        els.batchDownloadModal.classList.remove('hidden');
+    }
+
+    // 关闭批量下载选择窗口
+    function closeBatchDownloadModal() {
+        els.batchDownloadModal.classList.add('hidden');
+        els.downloadOptions.classList.remove('hidden');
+        els.downloadProgress.classList.add('hidden');
+        state.isDownloading = false;
+        state.downloadingStopped = false;
+    }
+
+    // Event Listeners
+    
+    // 主文件输入（默认相册）
+    els.imageInput.onchange = e => {
+        if (e.target.files.length > 0) {
+            handleFileSelect(e.target.files);
+        }
+    };
+    
+    // 相机输入
+    els.cameraInput.onchange = e => {
+        if (e.target.files.length > 0) {
+            handleFileSelect(e.target.files);
+        }
+    };
+    
+    // 文件输入
+    els.fileInput.onchange = e => {
+        if (e.target.files.length > 0) {
+            handleFileSelect(e.target.files);
+        }
+    };
+    
+    // 额外选项按钮
+    els.optionCamera.onclick = () => {
+        els.cameraInput.click();
+    };
+    
+    els.optionFiles.onclick = () => {
+        els.fileInput.click();
+    };
+
+    els.fullscreenWatermark.onchange = () => {
+        updateUIState();
+        updatePreviews();
+    };
+
+    els.positionPreset.onchange = e => {
+        if (POSITIONS[e.target.value]) {
+            state.watermarkPos = { ...POSITIONS[e.target.value] };
+            updatePreviews();
+        }
+    };
+
+    els.spacing.oninput = () => {
+        els.spacingValue.textContent = els.spacing.value;
+        updatePreviews();
+    };
+
+    els.imagePreview.onmousedown = e => {
+        if (!e.target.classList.contains('drag-overlay') || els.fullscreenWatermark.checked) return;
+        e.preventDefault();
+        state.isDragging = true;
+        state.currentCanvas = e.target.previousElementSibling;
+        state.dragStartPos = state.currentCanvas.getBoundingClientRect();
+        els.positionPreset.value = 'custom';
+    };
+
+    document.onmousemove = e => {
+        if (!state.isDragging || !state.dragStartPos || els.fullscreenWatermark.checked) return;
+        const rect = state.dragStartPos;
+        state.watermarkPos = {
+            x: Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width)),
+            y: Math.max(0, Math.min(1, (e.clientY - rect.top) / rect.height))
+        };
+        updatePreviews();
+    };
+
+    document.onmouseup = () => {
+        state.isDragging = false;
+        state.currentCanvas = null;
+        state.dragStartPos = null;
+    };
+
+    [els.watermarkText, els.fontFamily, els.fontSize, els.opacity].forEach(el => {
+        el.oninput = () => {
+            if (el === els.fontSize) els.fontSizeValue.textContent = el.value;
+            if (el === els.opacity) els.opacityValue.textContent = el.value;
+            updatePreviews();
+        };
+    });
+
+    document.querySelectorAll('input[name="fontWeight"]').forEach(el => {
+        el.onchange = updatePreviews;
+    });
+
+    els.downloadAll.onclick = () => {
+        const win = window.open('', '_blank');
+        win.document.write(`
+            <html><head><title>水印图片预览</title>
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+            <style>
+                body { margin: 20px; font-family: sans-serif; }
+                .img-wrap { margin-bottom: 20px; }
+                img { max-width: 100%; height: auto; display: block; margin-bottom: 10px; }
+                p { margin: 5px 0; color: #666; }
+                .tip { background: #f0f0f0; padding: 10px; border-radius: 5px; margin-bottom: 20px; }
+            </style>
+            </head><body>
+            <div class="tip">
+                <strong>保存说明：</strong><br>
+                • 电脑端：右键图片选择"另存为"<br>
+                • 手机端：长按图片选择"保存到相册"
+            </div>
+        `);
+        
+        state.images.forEach((img, i) => {
+            const canvas = createWatermarkedCanvas(img);
+            win.document.write(`
+                <div class="img-wrap">
+                    <img src="${canvas.toDataURL('image/png')}" alt="水印图片${i + 1}">
+                    <p>水印图片 ${i + 1}</p>
+                </div>
+            `);
+        });
+        
+        win.document.write('</body></html>');
+        win.document.close();
+    };
+
+    // 保存所有图片按钮
+    els.saveAll.onclick = () => {
+        if (isMobile()) {
+            showBatchDownloadModal();
+        } else {
+            // PC端：批量下载
+            state.images.forEach((img, i) => {
+                setTimeout(() => {
+                    downloadSingleImage(createWatermarkedCanvas(img), i + 1);
+                }, i * 200);
+            });
+        }
+    };
+
+    els.downloadZip.onclick = downloadAsZip;
+
+    // 批量下载模态框事件
+    els.silentDownloadBtn.onclick = attemptSilentBatchDownload;
+    els.manualDownloadBtn.onclick = createManualDownloadPage;
+    els.zipDownloadBtn.onclick = downloadAsZip;
+    els.closeModal.onclick = closeBatchDownloadModal;
+    els.stopDownload.onclick = () => {
+        state.downloadingStopped = true;
+        els.progressText.textContent = '❌ 下载已停止';
+        setTimeout(() => {
+            closeBatchDownloadModal();
+        }, 1000);
+    };
+
+    // 点击模态框外部关闭
+    els.batchDownloadModal.onclick = (e) => {
+        if (e.target === els.batchDownloadModal) {
+            closeBatchDownloadModal();
+        }
+    };
+
+    // 初始化
+    updateUIState();
+})();
+</script>
