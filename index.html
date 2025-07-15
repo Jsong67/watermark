@@ -96,73 +96,79 @@
             border-radius: 8px;
             z-index: 1000;
             text-align: center;
+            min-width: 200px;
         }
-        .mobile-download-page {
-            background: #f8f9fa;
-            min-height: 100vh;
-            padding: 20px;
-        }
-        .mobile-download-header {
-            background: white;
-            padding: 20px;
-            border-radius: 10px;
-            margin-bottom: 20px;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-        }
-        .mobile-image-container {
-            background: white;
-            padding: 15px;
-            border-radius: 10px;
-            margin-bottom: 15px;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-        }
-        .mobile-image-container img {
-            width: 100%;
-            height: auto;
-            border-radius: 8px;
-            margin-bottom: 10px;
-        }
-        .mobile-image-info {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            color: #666;
-            font-size: 14px;
-        }
-        .mobile-save-hint {
-            background: #e3f2fd;
-            color: #1976d2;
-            padding: 10px;
-            border-radius: 5px;
-            font-size: 12px;
-            text-align: center;
-            margin-top: 10px;
-        }
-        .mobile-progress {
-            background: #4caf50;
-            color: white;
-            padding: 15px;
-            border-radius: 8px;
-            margin-bottom: 20px;
-            text-align: center;
-        }
-        .mobile-back-btn {
+        .batch-download-container {
             position: fixed;
-            bottom: 20px;
-            right: 20px;
-            background: #2196f3;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.8);
+            z-index: 2000;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .batch-download-box {
+            background: white;
+            padding: 30px;
+            border-radius: 15px;
+            max-width: 90%;
+            width: 400px;
+            text-align: center;
+        }
+        .auto-download-btn {
+            background: #ff6b6b;
             color: white;
             border: none;
-            border-radius: 50%;
-            width: 56px;
-            height: 56px;
-            font-size: 24px;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+            padding: 15px 30px;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: bold;
             cursor: pointer;
-            z-index: 1000;
+            width: 100%;
+            margin: 10px 0;
         }
-        .mobile-back-btn:hover {
-            background: #1976d2;
+        .auto-download-btn:hover {
+            background: #ff5252;
+        }
+        .manual-download-btn {
+            background: #4ecdc4;
+            color: white;
+            border: none;
+            padding: 15px 30px;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: bold;
+            cursor: pointer;
+            width: 100%;
+            margin: 10px 0;
+        }
+        .manual-download-btn:hover {
+            background: #26a69a;
+        }
+        .close-btn {
+            background: #gray;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 8px;
+            cursor: pointer;
+            margin-top: 10px;
+        }
+        .progress-bar {
+            width: 100%;
+            height: 20px;
+            background: #f0f0f0;
+            border-radius: 10px;
+            overflow: hidden;
+            margin: 15px 0;
+        }
+        .progress-fill {
+            height: 100%;
+            background: #4caf50;
+            transition: width 0.3s ease;
         }
     </style>
 </head>
@@ -284,8 +290,34 @@
         </div>
     </div>
 
+    <!-- 批量下载选择窗口 -->
+    <div id="batchDownloadModal" class="batch-download-container hidden">
+        <div class="batch-download-box">
+            <h3 style="margin-bottom: 20px; color: #333;">📱 选择下载方式</h3>
+            <div id="downloadOptions">
+                <button id="autoDownloadBtn" class="auto-download-btn">
+                    🚀 尝试自动批量下载
+                </button>
+                <button id="manualDownloadBtn" class="manual-download-btn">
+                    👆 手动逐个保存页面
+                </button>
+                <button id="zipDownloadBtn" class="manual-download-btn" style="background: #9c27b0;">
+                    📦 下载ZIP压缩包
+                </button>
+            </div>
+            <div id="downloadProgress" class="hidden">
+                <div class="progress-bar">
+                    <div id="progressFill" class="progress-fill" style="width: 0%"></div>
+                </div>
+                <div id="progressText">准备下载...</div>
+                <button id="stopDownload" class="close-btn" style="background: #f44336;">停止下载</button>
+            </div>
+            <button id="closeModal" class="close-btn" style="background: #666;">关闭</button>
+        </div>
+    </div>
+
     <!-- 下载进度提示 -->
-    <div id="downloadProgress" class="download-progress hidden">
+    <div id="downloadProgressSimple" class="download-progress hidden">
         <div class="mb-2">正在准备下载...</div>
         <div class="text-sm opacity-75">请稍候</div>
     </div>
@@ -299,7 +331,9 @@
         watermarkPos: { x: 0.5, y: 0.5 },
         isDragging: false,
         dragStartPos: null,
-        currentCanvas: null
+        currentCanvas: null,
+        isDownloading: false,
+        downloadingStopped: false
     };
 
     const POSITIONS = {
@@ -331,8 +365,18 @@
         positionContainer: $('positionContainer'),
         spacingContainer: $('spacingContainer'),
         dragHint: $('dragHint'),
+        downloadProgressSimple: $('downloadProgressSimple'),
+        saveAllText: $('saveAllText'),
+        batchDownloadModal: $('batchDownloadModal'),
+        autoDownloadBtn: $('autoDownloadBtn'),
+        manualDownloadBtn: $('manualDownloadBtn'),
+        zipDownloadBtn: $('zipDownloadBtn'),
+        closeModal: $('closeModal'),
         downloadProgress: $('downloadProgress'),
-        saveAllText: $('saveAllText')
+        progressFill: $('progressFill'),
+        progressText: $('progressText'),
+        stopDownload: $('stopDownload'),
+        downloadOptions: $('downloadOptions')
     };
 
     // 检测是否为移动设备
@@ -343,8 +387,7 @@
     // 更新移动端按钮文字
     function updateMobileUI() {
         if (isMobile()) {
-            els.saveAllText.textContent = '手机端一键保存';
-            els.downloadZip.style.display = 'none'; // 隐藏ZIP下载按钮
+            els.saveAllText.textContent = '批量保存到手机';
         } else {
             els.saveAllText.textContent = '保存所有图片';
             els.downloadZip.style.display = 'block';
@@ -610,79 +653,185 @@
 
     // 下载单个图片
     function downloadSingleImage(canvas, index) {
-        if (isMobile()) {
-            // 移动端：在新窗口中打开图片
-            const dataUrl = canvas.toDataURL('image/png');
-            const newWindow = window.open();
-            newWindow.document.write(`
-                <html>
-                    <head>
-                        <title>水印图片${index}</title>
-                        <meta name="viewport" content="width=device-width, initial-scale=1.0">
-                        <style>
-                            body { margin: 0; padding: 20px; text-align: center; background: #f5f5f5; }
-                            img { max-width: 100%; height: auto; border-radius: 8px; box-shadow: 0 4px 8px rgba(0,0,0,0.1); }
-                            .tip { 
-                                margin: 15px 0; 
-                                color: #666; 
-                                font-size: 14px; 
-                                background: white;
-                                padding: 15px;
-                                border-radius: 8px;
-                                box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-                            }
-                        </style>
-                    </head>
-                    <body>
-                        <div class="tip">📱 长按图片选择"保存到相册"</div>
-                        <img src="${dataUrl}" alt="水印图片${index}">
-                    </body>
-                </html>
-            `);
-        } else {
-            // PC端：直接下载
-            const link = document.createElement('a');
-            link.href = canvas.toDataURL('image/png');
-            link.download = `水印图片_${index}.png`;
-            document.body.appendChild(link);
-            link.click();
-            document.body.removeChild(link);
-        }
+        const link = document.createElement('a');
+        link.href = canvas.toDataURL('image/png');
+        link.download = `水印图片_${index}.png`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
     }
 
-    // 移动端专用：创建批量下载页面
-    function createMobileBatchDownloadPage() {
+    // 自动批量下载（尝试绕过浏览器限制）
+    async function attemptAutoBatchDownload() {
+        if (state.images.length === 0) return;
+        
+        state.isDownloading = true;
+        state.downloadingStopped = false;
+        
+        els.downloadOptions.classList.add('hidden');
+        els.downloadProgress.classList.remove('hidden');
+        
+        const total = state.images.length;
+        let completed = 0;
+        
+        for (let i = 0; i < state.images.length; i++) {
+            if (state.downloadingStopped) break;
+            
+            try {
+                const canvas = createWatermarkedCanvas(state.images[i]);
+                
+                // 更新进度
+                els.progressText.textContent = `正在下载第 ${i + 1} 张图片...`;
+                
+                // 尝试下载
+                const link = document.createElement('a');
+                link.href = canvas.toDataURL('image/png');
+                link.download = `水印图片_${i + 1}.png`;
+                link.style.display = 'none';
+                document.body.appendChild(link);
+                
+                // 模拟用户交互来避免浏览器阻止
+                const event = new MouseEvent('click', {
+                    view: window,
+                    bubbles: true,
+                    cancelable: true
+                });
+                link.dispatchEvent(event);
+                
+                document.body.removeChild(link);
+                
+                completed++;
+                const progress = (completed / total) * 100;
+                els.progressFill.style.width = progress + '%';
+                
+                // 延迟，避免触发浏览器的反垃圾邮件机制
+                await new Promise(resolve => setTimeout(resolve, 800));
+                
+            } catch (error) {
+                console.error('下载失败:', error);
+            }
+        }
+        
+        if (!state.downloadingStopped) {
+            els.progressText.textContent = `✅ 已完成 ${completed} 张图片的下载！`;
+            setTimeout(() => {
+                closeBatchDownloadModal();
+            }, 2000);
+        }
+        
+        state.isDownloading = false;
+    }
+
+    // 创建手动保存页面
+    function createManualDownloadPage() {
         if (state.images.length === 0) return;
         
         const newWindow = window.open('', '_blank');
         const totalImages = state.images.length;
         let loadedImages = 0;
         
-        // 创建页面基础结构
         newWindow.document.write(`
             <html>
                 <head>
                     <title>批量保存图片到手机</title>
                     <meta name="viewport" content="width=device-width, initial-scale=1.0">
                     <style>
-                        ${document.querySelector('style').textContent}
+                        body { 
+                            margin: 0; 
+                            padding: 20px; 
+                            background: #f5f5f5; 
+                            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+                        }
+                        .header {
+                            background: white;
+                            padding: 20px;
+                            border-radius: 15px;
+                            margin-bottom: 20px;
+                            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+                            text-align: center;
+                        }
+                        .progress {
+                            background: #4caf50;
+                            color: white;
+                            padding: 15px;
+                            border-radius: 10px;
+                            margin: 15px 0;
+                        }
+                        .instruction {
+                            background: #e3f2fd;
+                            color: #1976d2;
+                            padding: 15px;
+                            border-radius: 10px;
+                            margin: 15px 0;
+                            font-size: 14px;
+                            line-height: 1.5;
+                        }
+                        .image-container {
+                            background: white;
+                            padding: 20px;
+                            border-radius: 15px;
+                            margin-bottom: 20px;
+                            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+                        }
+                        .image-container img {
+                            width: 100%;
+                            height: auto;
+                            border-radius: 10px;
+                            margin-bottom: 15px;
+                        }
+                        .image-info {
+                            display: flex;
+                            justify-content: space-between;
+                            align-items: center;
+                            color: #666;
+                            font-size: 14px;
+                            margin-bottom: 10px;
+                        }
+                        .save-hint {
+                            background: #fff3cd;
+                            color: #856404;
+                            padding: 12px;
+                            border-radius: 8px;
+                            font-size: 13px;
+                            text-align: center;
+                            border: 1px solid #ffeaa7;
+                        }
+                        .close-btn {
+                            position: fixed;
+                            bottom: 20px;
+                            right: 20px;
+                            background: #2196f3;
+                            color: white;
+                            border: none;
+                            border-radius: 50%;
+                            width: 56px;
+                            height: 56px;
+                            font-size: 24px;
+                            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+                            cursor: pointer;
+                            z-index: 1000;
+                        }
+                        .close-btn:hover {
+                            background: #1976d2;
+                        }
                     </style>
                 </head>
-                <body class="mobile-download-page">
-                    <div class="mobile-download-header">
-                        <h2 style="margin: 0 0 10px 0; color: #333;">📱 批量保存图片</h2>
-                        <div class="mobile-progress">
+                <body>
+                    <div class="header">
+                        <h2 style="margin: 0 0 10px 0; color: #333;">📱 批量保存图片到手机</h2>
+                        <div class="progress">
                             正在加载图片... (<span id="progress">0</span>/${totalImages})
                         </div>
-                        <div style="color: #666; font-size: 14px; line-height: 1.5;">
-                            <strong>💡 保存方法：</strong><br>
-                            1. 长按图片<br>
-                            2. 选择"保存到相册"或"下载图片"<br>
-                            3. 逐个保存所有图片
+                        <div class="instruction">
+                            <strong>📋 保存步骤：</strong><br>
+                            1. ✋ 长按图片<br>
+                            2. 📋 选择"保存到相册"或"下载图片"<br>
+                            3. 🔄 重复操作保存所有图片<br>
+                            4. ✅ 建议按顺序保存，避免遗漏
                         </div>
                     </div>
                     <div id="images-container"></div>
-                    <button class="mobile-back-btn" onclick="window.close()">✕</button>
+                    <button class="close-btn" onclick="window.close()">✕</button>
                 </body>
             </html>
         `);
@@ -697,14 +846,16 @@
                 const dataUrl = canvas.toDataURL('image/png');
                 
                 const imageContainer = newWindow.document.createElement('div');
-                imageContainer.className = 'mobile-image-container';
+                imageContainer.className = 'image-container';
                 imageContainer.innerHTML = `
-                    <img src="${dataUrl}" alt="水印图片${i + 1}">
-                    <div class="mobile-image-info">
-                        <span>图片 ${i + 1}</span>
+                    <div class="image-info">
+                        <span style="font-weight: bold; color: #333;">图片 ${i + 1}</span>
                         <span>尺寸: ${img.width}×${img.height}</span>
                     </div>
-                    <div class="mobile-save-hint">👆 长按图片保存到相册</div>
+                    <img src="${dataUrl}" alt="水印图片${i + 1}">
+                    <div class="save-hint">
+                        👆 长按上方图片选择"保存到相册"
+                    </div>
                 `;
                 
                 imagesContainer.appendChild(imageContainer);
@@ -713,25 +864,25 @@
                 progressEl.textContent = loadedImages;
                 
                 if (loadedImages === totalImages) {
-                    // 所有图片加载完成
-                    const progressDiv = newWindow.document.querySelector('.mobile-progress');
+                    const progressDiv = newWindow.document.querySelector('.progress');
                     progressDiv.innerHTML = `✅ 所有图片已准备完成！共 ${totalImages} 张图片`;
                     progressDiv.style.background = '#4caf50';
                 }
-            }, i * 200); // 延迟生成，避免同时处理过多图片
+            }, i * 300);
         });
+        
+        closeBatchDownloadModal();
     }
 
     // 批量下载为ZIP
     async function downloadAsZip() {
         if (state.images.length === 0) return;
         
-        els.downloadProgress.classList.remove('hidden');
+        els.downloadProgressSimple.classList.remove('hidden');
         
         try {
             const zip = new JSZip();
             
-            // 添加图片到ZIP
             for (let i = 0; i < state.images.length; i++) {
                 const canvas = createWatermarkedCanvas(state.images[i]);
                 const dataUrl = canvas.toDataURL('image/png');
@@ -739,10 +890,8 @@
                 zip.file(`水印图片_${i + 1}.png`, base64Data, { base64: true });
             }
             
-            // 生成ZIP文件
             const content = await zip.generateAsync({ type: 'blob' });
             
-            // 下载ZIP文件
             const link = document.createElement('a');
             link.href = URL.createObjectURL(content);
             link.download = `水印图片_${new Date().toISOString().slice(0, 10)}.zip`;
@@ -750,15 +899,30 @@
             link.click();
             document.body.removeChild(link);
             
-            // 清理URL对象
             URL.revokeObjectURL(link.href);
             
         } catch (error) {
             console.error('ZIP生成失败:', error);
             alert('ZIP文件生成失败，请重试');
         } finally {
-            els.downloadProgress.classList.add('hidden');
+            els.downloadProgressSimple.classList.add('hidden');
         }
+        
+        closeBatchDownloadModal();
+    }
+
+    // 显示批量下载选择窗口
+    function showBatchDownloadModal() {
+        els.batchDownloadModal.classList.remove('hidden');
+    }
+
+    // 关闭批量下载选择窗口
+    function closeBatchDownloadModal() {
+        els.batchDownloadModal.classList.add('hidden');
+        els.downloadOptions.classList.remove('hidden');
+        els.downloadProgress.classList.add('hidden');
+        state.isDownloading = false;
+        state.downloadingStopped = false;
     }
 
     // Event Listeners
@@ -857,10 +1021,10 @@
         win.document.close();
     };
 
+    // 保存所有图片按钮
     els.saveAll.onclick = () => {
         if (isMobile()) {
-            // 移动端：创建专门的批量下载页面
-            createMobileBatchDownloadPage();
+            showBatchDownloadModal();
         } else {
             // PC端：批量下载
             state.images.forEach((img, i) => {
@@ -872,6 +1036,26 @@
     };
 
     els.downloadZip.onclick = downloadAsZip;
+
+    // 批量下载模态框事件
+    els.autoDownloadBtn.onclick = attemptAutoBatchDownload;
+    els.manualDownloadBtn.onclick = createManualDownloadPage;
+    els.zipDownloadBtn.onclick = downloadAsZip;
+    els.closeModal.onclick = closeBatchDownloadModal;
+    els.stopDownload.onclick = () => {
+        state.downloadingStopped = true;
+        els.progressText.textContent = '❌ 下载已停止';
+        setTimeout(() => {
+            closeBatchDownloadModal();
+        }, 1000);
+    };
+
+    // 点击模态框外部关闭
+    els.batchDownloadModal.onclick = (e) => {
+        if (e.target === els.batchDownloadModal) {
+            closeBatchDownloadModal();
+        }
+    };
 
     // 初始化
     updateUIState();
