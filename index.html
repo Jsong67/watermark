@@ -118,22 +118,7 @@
             width: 400px;
             text-align: center;
         }
-        .auto-download-btn {
-            background: #ff6b6b;
-            color: white;
-            border: none;
-            padding: 15px 30px;
-            border-radius: 8px;
-            font-size: 16px;
-            font-weight: bold;
-            cursor: pointer;
-            width: 100%;
-            margin: 10px 0;
-        }
-        .auto-download-btn:hover {
-            background: #ff5252;
-        }
-        .manual-download-btn {
+        .download-option-btn {
             background: #4ecdc4;
             color: white;
             border: none;
@@ -143,10 +128,22 @@
             font-weight: bold;
             cursor: pointer;
             width: 100%;
-            margin: 10px 0;
+            margin: 8px 0;
         }
-        .manual-download-btn:hover {
+        .download-option-btn:hover {
             background: #26a69a;
+        }
+        .download-option-btn.primary {
+            background: #ff6b6b;
+        }
+        .download-option-btn.primary:hover {
+            background: #ff5252;
+        }
+        .download-option-btn.secondary {
+            background: #9c27b0;
+        }
+        .download-option-btn.secondary:hover {
+            background: #7b1fa2;
         }
         .close-btn {
             background: #gray;
@@ -156,19 +153,6 @@
             border-radius: 8px;
             cursor: pointer;
             margin-top: 10px;
-        }
-        .progress-bar {
-            width: 100%;
-            height: 20px;
-            background: #f0f0f0;
-            border-radius: 10px;
-            overflow: hidden;
-            margin: 15px 0;
-        }
-        .progress-fill {
-            height: 100%;
-            background: #4caf50;
-            transition: width 0.3s ease;
         }
         .image-input-options {
             display: flex;
@@ -202,6 +186,18 @@
             height: 0;
             opacity: 0;
             pointer-events: none;
+        }
+        .copy-success {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: #4caf50;
+            color: white;
+            padding: 15px 25px;
+            border-radius: 8px;
+            z-index: 3000;
+            font-size: 16px;
         }
     </style>
 </head>
@@ -334,27 +330,23 @@
         </div>
     </div>
 
-    <!-- 批量下载选择窗口 -->
+    <!-- 批量保存选择窗口 -->
     <div id="batchDownloadModal" class="batch-download-container hidden">
         <div class="batch-download-box">
             <h3 style="margin-bottom: 20px; color: #333;">📱 选择保存方式</h3>
             <div id="downloadOptions">
-                <button id="silentDownloadBtn" class="auto-download-btn">
-                    🚀 静默批量下载
+                <button id="combinedImageBtn" class="download-option-btn primary">
+                    🖼️ 生成拼图版 (推荐)
                 </button>
-                <button id="manualDownloadBtn" class="manual-download-btn">
-                    👆 手动逐个保存
+                <button id="manualDownloadBtn" class="download-option-btn">
+                    👆 逐个手动保存
                 </button>
-                <button id="zipDownloadBtn" class="manual-download-btn" style="background: #9c27b0;">
+                <button id="copyImageBtn" class="download-option-btn">
+                    📋 复制图片到剪贴板
+                </button>
+                <button id="zipDownloadBtn" class="download-option-btn secondary">
                     📦 下载ZIP压缩包
                 </button>
-            </div>
-            <div id="downloadProgress" class="hidden">
-                <div class="progress-bar">
-                    <div id="progressFill" class="progress-fill" style="width: 0%"></div>
-                </div>
-                <div id="progressText">准备下载...</div>
-                <button id="stopDownload" class="close-btn" style="background: #f44336;">停止下载</button>
             </div>
             <button id="closeModal" class="close-btn" style="background: #666;">关闭</button>
         </div>
@@ -362,8 +354,13 @@
 
     <!-- 简单下载进度提示 -->
     <div id="downloadProgressSimple" class="download-progress hidden">
-        <div class="mb-2">正在准备下载...</div>
+        <div class="mb-2">正在准备...</div>
         <div class="text-sm opacity-75">请稍候</div>
+    </div>
+
+    <!-- 复制成功提示 -->
+    <div id="copySuccess" class="copy-success hidden">
+        ✅ 图片已复制到剪贴板
     </div>
 </body>
 </html>
@@ -376,8 +373,7 @@
         isDragging: false,
         dragStartPos: null,
         currentCanvas: null,
-        isDownloading: false,
-        downloadingStopped: false
+        currentCopyIndex: 0
     };
 
     const POSITIONS = {
@@ -416,15 +412,13 @@
         downloadProgressSimple: $('downloadProgressSimple'),
         saveAllText: $('saveAllText'),
         batchDownloadModal: $('batchDownloadModal'),
-        silentDownloadBtn: $('silentDownloadBtn'),
+        combinedImageBtn: $('combinedImageBtn'),
         manualDownloadBtn: $('manualDownloadBtn'),
+        copyImageBtn: $('copyImageBtn'),
         zipDownloadBtn: $('zipDownloadBtn'),
         closeModal: $('closeModal'),
-        downloadProgress: $('downloadProgress'),
-        progressFill: $('progressFill'),
-        progressText: $('progressText'),
-        stopDownload: $('stopDownload'),
-        downloadOptions: $('downloadOptions')
+        downloadOptions: $('downloadOptions'),
+        copySuccess: $('copySuccess')
     };
 
     // 检测是否为移动设备
@@ -519,38 +513,29 @@
         ctx.fillStyle = `rgba(255, 255, 255, ${opacity})`;
         ctx.font = `${weight} ${fontSize}px ${fontFamily}`;
         
-        // 计算文本尺寸
         const textMetrics = ctx.measureText(text);
         const textWidth = textMetrics.width;
         const textHeight = fontSize;
         
-        // 计算间距（确保合理的最小间距）
         const stepX = Math.max(textWidth + spacing, 100);
         const stepY = Math.max(textHeight + spacing, 60);
         
-        // 保存当前状态
         ctx.save();
         
-        // 设置旋转角度（-45度，更自然的水印效果）
         const angle = -Math.PI / 4;
         
-        // 移动到画布中心并旋转
         ctx.translate(canvas.width / 2, canvas.height / 2);
         ctx.rotate(angle);
         
-        // 计算旋转后需要覆盖的区域大小
         const diagonal = Math.sqrt(canvas.width * canvas.width + canvas.height * canvas.height);
         const coverSize = diagonal * 1.2;
         
-        // 计算行列数（限制最大数量以防止性能问题）
         const maxCols = Math.min(Math.ceil(coverSize / stepX), 20);
         const maxRows = Math.min(Math.ceil(coverSize / stepY), 20);
         
-        // 计算起始位置（居中绘制）
         const startX = -(maxCols * stepX) / 2;
         const startY = -(maxRows * stepY) / 2;
         
-        // 绘制水印网格
         for(let row = 0; row < maxRows; row++) {
             for(let col = 0; col < maxCols; col++) {
                 const x = startX + col * stepX;
@@ -559,7 +544,6 @@
             }
         }
         
-        // 恢复状态
         ctx.restore();
     }
 
@@ -569,15 +553,12 @@
         canvas.width = img.width;
         canvas.height = img.height;
         
-        // 绘制原始图片
         ctx.drawImage(img, 0, 0);
         
-        // 添加LSB水印
         const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
         const watermarkedData = encodeLSB(imageData, els.watermarkText.value);
         ctx.putImageData(watermarkedData, 0, 0);
         
-        // 添加可见水印
         const opacity = els.opacity.value / 100;
         const weight = document.querySelector('input[name="fontWeight"]:checked').value;
         const fontSize = Math.round((els.fontSize.value / 100) * canvas.height);
@@ -585,10 +566,8 @@
         const fontFamily = els.fontFamily.value;
         
         if (els.fullscreenWatermark.checked) {
-            // 全屏水印
             drawFullscreenWatermark(ctx, canvas, text, fontSize, opacity, weight, fontFamily);
         } else {
-            // 单个水印
             ctx.fillStyle = `rgba(255, 255, 255, ${opacity})`;
             ctx.font = `${weight} ${fontSize}px ${fontFamily}`;
             
@@ -627,14 +606,11 @@
     function updateUIState() {
         const isFullscreen = els.fullscreenWatermark.checked;
         
-        // 控制位置相关控件的可用性
         els.positionContainer.classList.toggle('fullscreen-disabled', isFullscreen);
         els.spacingContainer.classList.toggle('hidden', !isFullscreen);
         
-        // 更新拖拽提示
         els.dragHint.textContent = isFullscreen ? '全屏水印模式' : '拖动可调整可见水印位置';
         
-        // 禁用/启用拖拽功能
         const overlays = document.querySelectorAll('.drag-overlay');
         overlays.forEach(overlay => {
             overlay.style.pointerEvents = isFullscreen ? 'none' : 'auto';
@@ -709,87 +685,176 @@
         document.body.removeChild(link);
     }
 
-    // 静默批量下载（使用更高级的技术）
-    async function attemptSilentBatchDownload() {
+    // 生成拼图版本（推荐方案）
+    function createCombinedImage() {
         if (state.images.length === 0) return;
         
-        state.isDownloading = true;
-        state.downloadingStopped = false;
+        els.downloadProgressSimple.classList.remove('hidden');
+        els.downloadProgressSimple.querySelector('.mb-2').textContent = '正在生成拼图版...';
         
-        els.downloadOptions.classList.add('hidden');
-        els.downloadProgress.classList.remove('hidden');
-        
-        const total = state.images.length;
-        let completed = 0;
+        setTimeout(() => {
+            const canvases = state.images.map(img => createWatermarkedCanvas(img));
+            
+            // 计算网格布局
+            const cols = Math.ceil(Math.sqrt(canvases.length));
+            const rows = Math.ceil(canvases.length / cols);
+            
+            // 找出最大的图片尺寸
+            let maxWidth = 0;
+            let maxHeight = 0;
+            canvases.forEach(canvas => {
+                maxWidth = Math.max(maxWidth, canvas.width);
+                maxHeight = Math.max(maxHeight, canvas.height);
+            });
+            
+            // 设置合适的单元格尺寸
+            const cellWidth = Math.min(maxWidth, 800);
+            const cellHeight = Math.min(maxHeight, 600);
+            
+            // 创建大画布
+            const combinedCanvas = document.createElement('canvas');
+            const ctx = combinedCanvas.getContext('2d');
+            combinedCanvas.width = cols * cellWidth;
+            combinedCanvas.height = rows * cellHeight;
+            
+            // 白色背景
+            ctx.fillStyle = 'white';
+            ctx.fillRect(0, 0, combinedCanvas.width, combinedCanvas.height);
+            
+            // 绘制每个图片
+            canvases.forEach((canvas, i) => {
+                const col = i % cols;
+                const row = Math.floor(i / cols);
+                
+                const x = col * cellWidth;
+                const y = row * cellHeight;
+                
+                // 计算缩放比例
+                const scaleX = cellWidth / canvas.width;
+                const scaleY = cellHeight / canvas.height;
+                const scale = Math.min(scaleX, scaleY, 1);
+                
+                const scaledWidth = canvas.width * scale;
+                const scaledHeight = canvas.height * scale;
+                
+                // 居中绘制
+                const drawX = x + (cellWidth - scaledWidth) / 2;
+                const drawY = y + (cellHeight - scaledHeight) / 2;
+                
+                ctx.drawImage(canvas, drawX, drawY, scaledWidth, scaledHeight);
+                
+                // 添加边框
+                ctx.strokeStyle = '#ddd';
+                ctx.lineWidth = 1;
+                ctx.strokeRect(x, y, cellWidth, cellHeight);
+                
+                // 添加序号
+                ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+                ctx.font = '16px Arial';
+                ctx.textAlign = 'left';
+                ctx.textBaseline = 'top';
+                ctx.fillText(`${i + 1}`, x + 5, y + 5);
+            });
+            
+            els.downloadProgressSimple.classList.add('hidden');
+            
+            // 在新窗口显示
+            const newWindow = window.open('', '_blank');
+            newWindow.document.write(`
+                <html>
+                    <head>
+                        <title>拼图版水印图片</title>
+                        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+                        <style>
+                            body { 
+                                margin: 0; 
+                                padding: 20px; 
+                                background: #f5f5f5; 
+                                text-align: center;
+                                font-family: Arial, sans-serif;
+                            }
+                            .container {
+                                background: white;
+                                padding: 20px;
+                                border-radius: 10px;
+                                box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+                                margin-bottom: 20px;
+                            }
+                            img { 
+                                max-width: 100%; 
+                                height: auto; 
+                                border-radius: 8px;
+                                box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+                            }
+                            .tip { 
+                                color: #666; 
+                                font-size: 14px; 
+                                margin-bottom: 15px;
+                                line-height: 1.5;
+                            }
+                        </style>
+                    </head>
+                    <body>
+                        <div class="container">
+                            <h2>拼图版水印图片</h2>
+                            <div class="tip">
+                                📱 手机端：长按图片选择"保存到相册"<br>
+                                💻 电脑端：右键图片选择"另存为"<br>
+                                共 ${state.images.length} 张图片，按序号排列
+                            </div>
+                            <img src="${combinedCanvas.toDataURL('image/png')}" alt="拼图版水印图片">
+                        </div>
+                    </body>
+                </html>
+            `);
+            
+            closeBatchDownloadModal();
+        }, 100);
+    }
+
+    // 复制图片到剪贴板
+    async function copyImageToClipboard() {
+        if (state.images.length === 0) return;
         
         try {
-            // 使用更现代的方法
-            if ('showSaveFilePicker' in window) {
-                // 支持 File System Access API 的现代浏览器
-                for (let i = 0; i < state.images.length; i++) {
-                    if (state.downloadingStopped) break;
-                    
-                    const canvas = createWatermarkedCanvas(state.images[i]);
-                    const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/png'));
-                    
-                    try {
-                        const fileHandle = await window.showSaveFilePicker({
-                            suggestedName: `水印图片_${i + 1}.png`,
-                            types: [{
-                                description: 'PNG图片',
-                                accept: { 'image/png': ['.png'] }
-                            }]
-                        });
-                        
-                        const writable = await fileHandle.createWritable();
-                        await writable.write(blob);
-                        await writable.close();
-                        
-                        completed++;
-                        els.progressText.textContent = `已保存第 ${completed} 张图片`;
-                        els.progressFill.style.width = (completed / total) * 100 + '%';
-                        
-                    } catch (err) {
-                        if (err.name !== 'AbortError') {
-                            console.error('保存失败:', err);
-                        }
-                        break;
-                    }
-                }
+            const canvas = createWatermarkedCanvas(state.images[state.currentCopyIndex]);
+            const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/png'));
+            
+            await navigator.clipboard.write([
+                new ClipboardItem({
+                    'image/png': blob
+                })
+            ]);
+            
+            showCopySuccess();
+            
+            // 自动切换到下一张
+            state.currentCopyIndex = (state.currentCopyIndex + 1) % state.images.length;
+            
+            if (state.currentCopyIndex === 0) {
+                els.copyImageBtn.textContent = '✅ 已复制完所有图片';
+                els.copyImageBtn.disabled = true;
+                setTimeout(() => {
+                    els.copyImageBtn.textContent = '📋 复制图片到剪贴板';
+                    els.copyImageBtn.disabled = false;
+                    state.currentCopyIndex = 0;
+                }, 3000);
             } else {
-                // 降级到传统方法
-                for (let i = 0; i < state.images.length; i++) {
-                    if (state.downloadingStopped) break;
-                    
-                    const canvas = createWatermarkedCanvas(state.images[i]);
-                    els.progressText.textContent = `正在准备第 ${i + 1} 张图片...`;
-                    
-                    // 创建下载链接
-                    const link = document.createElement('a');
-                    link.href = canvas.toDataURL('image/png');
-                    link.download = `水印图片_${i + 1}.png`;
-                    link.style.display = 'none';
-                    document.body.appendChild(link);
-                    link.click();
-                    document.body.removeChild(link);
-                    
-                    completed++;
-                    els.progressFill.style.width = (completed / total) * 100 + '%';
-                    
-                    // 适当延迟
-                    await new Promise(resolve => setTimeout(resolve, 100));
-                }
+                els.copyImageBtn.textContent = `📋 复制第${state.currentCopyIndex + 1}张 (${state.currentCopyIndex + 1}/${state.images.length})`;
             }
+            
         } catch (error) {
-            console.error('批量下载失败:', error);
+            console.error('复制失败:', error);
+            alert('复制失败，请尝试其他方法');
         }
-        
-        if (!state.downloadingStopped) {
-            els.progressText.textContent = `✅ 已完成 ${completed} 张图片！`;
-            setTimeout(() => closeBatchDownloadModal(), 2000);
-        }
-        
-        state.isDownloading = false;
+    }
+
+    // 显示复制成功提示
+    function showCopySuccess() {
+        els.copySuccess.classList.remove('hidden');
+        setTimeout(() => {
+            els.copySuccess.classList.add('hidden');
+        }, 2000);
     }
 
     // 创建手动保存页面
@@ -797,12 +862,11 @@
         if (state.images.length === 0) return;
         
         const newWindow = window.open('', '_blank');
-        const totalImages = state.images.length;
         
         newWindow.document.write(`
             <html>
                 <head>
-                    <title>批量保存图片</title>
+                    <title>手动保存图片</title>
                     <meta name="viewport" content="width=device-width, initial-scale=1.0">
                     <style>
                         body { 
@@ -880,7 +944,7 @@
                 </head>
                 <body>
                     <div class="header">
-                        <h2 style="margin: 0 0 10px 0; color: #333;">📱 手动保存图片</h2>
+                        <h2 style="margin: 0 0 10px 0; color: #333;">📱 逐个手动保存</h2>
                         <div class="instruction">
                             <strong>💡 保存方法：</strong><br>
                             1. ✋ 长按图片<br>
@@ -896,7 +960,6 @@
         
         const imagesContainer = newWindow.document.getElementById('images-container');
         
-        // 逐个生成图片
         state.images.forEach((img, i) => {
             const canvas = createWatermarkedCanvas(img);
             const dataUrl = canvas.toDataURL('image/png');
@@ -925,6 +988,7 @@
         if (state.images.length === 0) return;
         
         els.downloadProgressSimple.classList.remove('hidden');
+        els.downloadProgressSimple.querySelector('.mb-2').textContent = '正在生成ZIP...';
         
         try {
             const zip = new JSZip();
@@ -960,15 +1024,15 @@
     // 显示批量下载选择窗口
     function showBatchDownloadModal() {
         els.batchDownloadModal.classList.remove('hidden');
+        // 重置复制按钮状态
+        els.copyImageBtn.textContent = '📋 复制图片到剪贴板';
+        els.copyImageBtn.disabled = false;
+        state.currentCopyIndex = 0;
     }
 
     // 关闭批量下载选择窗口
     function closeBatchDownloadModal() {
         els.batchDownloadModal.classList.add('hidden');
-        els.downloadOptions.classList.remove('hidden');
-        els.downloadProgress.classList.add('hidden');
-        state.isDownloading = false;
-        state.downloadingStopped = false;
     }
 
     // Event Listeners
@@ -1108,17 +1172,11 @@
     els.downloadZip.onclick = downloadAsZip;
 
     // 批量下载模态框事件
-    els.silentDownloadBtn.onclick = attemptSilentBatchDownload;
+    els.combinedImageBtn.onclick = createCombinedImage;
     els.manualDownloadBtn.onclick = createManualDownloadPage;
+    els.copyImageBtn.onclick = copyImageToClipboard;
     els.zipDownloadBtn.onclick = downloadAsZip;
     els.closeModal.onclick = closeBatchDownloadModal;
-    els.stopDownload.onclick = () => {
-        state.downloadingStopped = true;
-        els.progressText.textContent = '❌ 下载已停止';
-        setTimeout(() => {
-            closeBatchDownloadModal();
-        }, 1000);
-    };
 
     // 点击模态框外部关闭
     els.batchDownloadModal.onclick = (e) => {
