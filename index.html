@@ -195,7 +195,7 @@
                     <label class="block text-sm font-medium text-gray-700">
                         水印间距：<span id="spacingValue">150</span>px
                     </label>
-                    <input type="range" id="spacing" min="50" max="300" value="150" class="w-full">
+                    <input type="range" id="spacing" min="80" max="300" value="150" class="w-full">
                 </div>
             </div>
 
@@ -352,9 +352,9 @@
         });
     }
 
-    // 绘制全屏水印
+    // 优化后的全屏水印绘制函数
     function drawFullscreenWatermark(ctx, canvas, text, fontSize, opacity, weight, fontFamily) {
-        const spacing = els.spacing.value;
+        const spacing = parseInt(els.spacing.value);
         
         ctx.fillStyle = `rgba(255, 255, 255, ${opacity})`;
         ctx.font = `${weight} ${fontSize}px ${fontFamily}`;
@@ -364,28 +364,37 @@
         const textWidth = textMetrics.width;
         const textHeight = fontSize;
         
+        // 计算间距（确保合理的最小间距）
+        const stepX = Math.max(textWidth + spacing, 100);
+        const stepY = Math.max(textHeight + spacing, 60);
+        
         // 保存当前状态
         ctx.save();
         
-        // 设置旋转角度（45度）
-        const angle = Math.PI / 4; // 45度
+        // 设置旋转角度（-45度，更自然的水印效果）
+        const angle = -Math.PI / 4;
         
-        // 计算需要的行数和列数
-        const diagonal = Math.sqrt(canvas.width * canvas.width + canvas.height * canvas.height);
-        const stepX = textWidth + spacing;
-        const stepY = textHeight + spacing;
-        
-        // 移动到画布中心
+        // 移动到画布中心并旋转
         ctx.translate(canvas.width / 2, canvas.height / 2);
         ctx.rotate(angle);
         
-        // 计算起始位置
-        const startX = -diagonal;
-        const startY = -diagonal;
+        // 计算旋转后需要覆盖的区域大小
+        const diagonal = Math.sqrt(canvas.width * canvas.width + canvas.height * canvas.height);
+        const coverSize = diagonal * 1.2; // 稍微扩大覆盖范围
+        
+        // 计算行列数（限制最大数量以防止性能问题）
+        const maxCols = Math.min(Math.ceil(coverSize / stepX), 20);
+        const maxRows = Math.min(Math.ceil(coverSize / stepY), 20);
+        
+        // 计算起始位置（居中绘制）
+        const startX = -(maxCols * stepX) / 2;
+        const startY = -(maxRows * stepY) / 2;
         
         // 绘制水印网格
-        for(let y = startY; y < diagonal; y += stepY) {
-            for(let x = startX; x < diagonal; x += stepX) {
+        for(let row = 0; row < maxRows; row++) {
+            for(let col = 0; col < maxCols; col++) {
+                const x = startX + col * stepX;
+                const y = startY + row * stepY;
                 ctx.fillText(text, x, y);
             }
         }
