@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>图片批量加水印工具【+7AI实验室】</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;700&family=Ma+Shan+Zheng&family=ZCOOL+XiaoWei&family=ZCOOL+KuaiLe&family=ZCOOL+QingKe+HuangYou&display=swap">
     <style>
         .canvas-wrapper {
@@ -72,13 +73,29 @@
             padding: 1rem 0;
             text-align: center;
             background-color: #ffffff;
-            max-width: 56rem; /* 等同于 max-w-4xl */
+            max-width: 56rem;
         }
         .banner-image {
             width: 100%;
             height: auto;
             margin: 0 auto;
-            display: block; /* 防止图片下方出现额外空间 */
+            display: block;
+        }
+        .fullscreen-disabled {
+            opacity: 0.5;
+            pointer-events: none;
+        }
+        .download-progress {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(0, 0, 0, 0.8);
+            color: white;
+            padding: 20px;
+            border-radius: 8px;
+            z-index: 1000;
+            text-align: center;
         }
     </style>
 </head>
@@ -125,6 +142,15 @@
 
             <div class="grid grid-cols-2 gap-4">
                 <div class="space-y-2">
+                    <label class="block text-sm font-medium text-gray-700">水印模式</label>
+                    <div class="flex items-center space-x-4">
+                        <label class="inline-flex items-center">
+                            <input type="checkbox" id="fullscreenWatermark" class="rounded border-gray-300 text-indigo-600 shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50">
+                            <span class="ml-2 text-sm">全屏水印</span>
+                        </label>
+                    </div>
+                </div>
+                <div class="space-y-2" id="positionContainer">
                     <label class="block text-sm font-medium text-gray-700">位置预设</label>
                     <select id="positionPreset" class="block w-full rounded-md border-gray-300 shadow-sm p-2">
                         <option value="center">居中</option>
@@ -134,6 +160,9 @@
                         <option value="bottom-right">右下角</option>
                     </select>
                 </div>
+            </div>
+
+            <div class="grid grid-cols-2 gap-4">
                 <div class="space-y-2">
                     <label class="block text-sm font-medium text-gray-700">字体粗细</label>
                     <div class="flex space-x-4">
@@ -147,25 +176,31 @@
                         </label>
                     </div>
                 </div>
-            </div>
-
-            <div class="grid grid-cols-2 gap-4">
                 <div class="space-y-2">
                     <label class="block text-sm font-medium text-gray-700">
                         字体大小：<span id="fontSizeValue">5</span>%
                     </label>
                     <input type="range" id="fontSize" min="1" max="20" value="5" step="0.5" class="w-full">
                 </div>
+            </div>
+
+            <div class="grid grid-cols-2 gap-4">
                 <div class="space-y-2">
                     <label class="block text-sm font-medium text-gray-700">
                         可见水印透明度：<span id="opacityValue">50</span>%
                     </label>
                     <input type="range" id="opacity" min="10" max="100" value="50" class="w-full">
                 </div>
+                <div class="space-y-2" id="spacingContainer">
+                    <label class="block text-sm font-medium text-gray-700">
+                        水印间距：<span id="spacingValue">150</span>px
+                    </label>
+                    <input type="range" id="spacing" min="50" max="300" value="150" class="w-full">
+                </div>
             </div>
 
             <div id="previewArea" class="hidden space-y-4">
-                <h3 class="font-medium text-lg">预览（拖动可调整可见水印位置）</h3>
+                <h3 class="font-medium text-lg">预览（<span id="dragHint">拖动可调整可见水印位置</span>）</h3>
                 <div id="imagePreview" class="grid gap-4"></div>
                 <div class="flex gap-4">
                     <button id="downloadAll" class="flex-1 bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700">
@@ -174,13 +209,21 @@
                     <button id="saveAll" class="flex-1 bg-green-600 text-white py-2 px-4 rounded-md hover:bg-green-700">
                         保存所有图片
                     </button>
+                    <button id="downloadZip" class="flex-1 bg-purple-600 text-white py-2 px-4 rounded-md hover:bg-purple-700">
+                        打包下载ZIP
+                    </button>
                 </div>
             </div>
         </div>
     </div>
+
+    <!-- 下载进度提示 -->
+    <div id="downloadProgress" class="download-progress hidden">
+        <div class="mb-2">正在生成ZIP文件...</div>
+        <div class="text-sm opacity-75">请稍候，文件较大时可能需要一些时间</div>
+    </div>
 </body>
 </html>
-
 
 <script>
 (() => {
@@ -207,31 +250,42 @@
         fontSize: $('fontSize'),
         fontFamily: $('fontFamily'),
         opacity: $('opacity'),
+        spacing: $('spacing'),
         previewArea: $('previewArea'),
         imagePreview: $('imagePreview'),
         downloadAll: $('downloadAll'),
         saveAll: $('saveAll'),
+        downloadZip: $('downloadZip'),
         fontSizeValue: $('fontSizeValue'),
         opacityValue: $('opacityValue'),
-        positionPreset: $('positionPreset')
+        spacingValue: $('spacingValue'),
+        positionPreset: $('positionPreset'),
+        fullscreenWatermark: $('fullscreenWatermark'),
+        positionContainer: $('positionContainer'),
+        spacingContainer: $('spacingContainer'),
+        dragHint: $('dragHint'),
+        downloadProgress: $('downloadProgress')
     };
+
+    // 检测是否为移动设备
+    function isMobile() {
+        return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+    }
 
     // LSB水印编码函数
     function encodeLSB(imageData, text) {
         const data = new Uint8ClampedArray(imageData.data);
         const binaryText = textToBinary(text);
-        const bits = 2;  // 固定使用2位LSB
+        const bits = 2;
         const mask = (1 << bits) - 1;
         const inverseMask = ~mask & 0xFF;
         
-        // 在前32位存储文本长度
         const textLength = binaryText.length;
         for(let i = 0; i < 32; i++) {
             const lengthBit = (textLength >> i) & 1;
             data[i * 4] = (data[i * 4] & inverseMask) | lengthBit;
         }
 
-        // 存储文本数据
         for(let i = 0; i < binaryText.length; i++) {
             const pixelIndex = (i + 32) * 4;
             if(pixelIndex >= data.length) break;
@@ -247,15 +301,13 @@
     function decodeLSB(imageData) {
         const data = imageData.data;
         let textLength = 0;
-        const bits = 2;  // 固定使用2位LSB
+        const bits = 2;
 
-        // 读取文本长度
         for(let i = 0; i < 32; i++) {
             const lengthBit = data[i * 4] & 1;
             textLength |= (lengthBit << i);
         }
 
-        // 读取文本数据
         let binaryText = '';
         const mask = (1 << bits) - 1;
         
@@ -270,7 +322,6 @@
         return binaryToText(binaryText);
     }
 
-    // 文本转二进制
     function textToBinary(text) {
         let binary = '';
         for(let i = 0; i < text.length; i++) {
@@ -279,7 +330,6 @@
         return binary;
     }
 
-    // 二进制转文本
     function binaryToText(binary) {
         let text = '';
         for(let i = 0; i < binary.length; i += 16) {
@@ -302,6 +352,48 @@
         });
     }
 
+    // 绘制全屏水印
+    function drawFullscreenWatermark(ctx, canvas, text, fontSize, opacity, weight, fontFamily) {
+        const spacing = els.spacing.value;
+        
+        ctx.fillStyle = `rgba(255, 255, 255, ${opacity})`;
+        ctx.font = `${weight} ${fontSize}px ${fontFamily}`;
+        
+        // 计算文本尺寸
+        const textMetrics = ctx.measureText(text);
+        const textWidth = textMetrics.width;
+        const textHeight = fontSize;
+        
+        // 保存当前状态
+        ctx.save();
+        
+        // 设置旋转角度（45度）
+        const angle = Math.PI / 4; // 45度
+        
+        // 计算需要的行数和列数
+        const diagonal = Math.sqrt(canvas.width * canvas.width + canvas.height * canvas.height);
+        const stepX = textWidth + spacing;
+        const stepY = textHeight + spacing;
+        
+        // 移动到画布中心
+        ctx.translate(canvas.width / 2, canvas.height / 2);
+        ctx.rotate(angle);
+        
+        // 计算起始位置
+        const startX = -diagonal;
+        const startY = -diagonal;
+        
+        // 绘制水印网格
+        for(let y = startY; y < diagonal; y += stepY) {
+            for(let x = startX; x < diagonal; x += stepX) {
+                ctx.fillText(text, x, y);
+            }
+        }
+        
+        // 恢复状态
+        ctx.restore();
+    }
+
     function createWatermarkedCanvas(img) {
         const canvas = document.createElement('canvas');
         const ctx = canvas.getContext('2d');
@@ -320,17 +412,25 @@
         const opacity = els.opacity.value / 100;
         const weight = document.querySelector('input[name="fontWeight"]:checked').value;
         const fontSize = Math.round((els.fontSize.value / 100) * canvas.height);
+        const text = els.watermarkText.value;
+        const fontFamily = els.fontFamily.value;
         
-        ctx.fillStyle = `rgba(255, 255, 255, ${opacity})`;
-        ctx.font = `${weight} ${fontSize}px ${els.fontFamily.value}`;
-        
-        const x = state.watermarkPos.x * canvas.width;
-        const y = state.watermarkPos.y * canvas.height;
-        
-        ctx.textAlign = x < canvas.width * 0.4 ? 'left' : x > canvas.width * 0.6 ? 'right' : 'center';
-        ctx.textBaseline = y < canvas.height * 0.4 ? 'top' : y > canvas.height * 0.6 ? 'bottom' : 'middle';
-        
-        ctx.fillText(els.watermarkText.value, x, y);
+        if (els.fullscreenWatermark.checked) {
+            // 全屏水印
+            drawFullscreenWatermark(ctx, canvas, text, fontSize, opacity, weight, fontFamily);
+        } else {
+            // 单个水印
+            ctx.fillStyle = `rgba(255, 255, 255, ${opacity})`;
+            ctx.font = `${weight} ${fontSize}px ${fontFamily}`;
+            
+            const x = state.watermarkPos.x * canvas.width;
+            const y = state.watermarkPos.y * canvas.height;
+            
+            ctx.textAlign = x < canvas.width * 0.4 ? 'left' : x > canvas.width * 0.6 ? 'right' : 'center';
+            ctx.textBaseline = y < canvas.height * 0.4 ? 'top' : y > canvas.height * 0.6 ? 'bottom' : 'middle';
+            
+            ctx.fillText(text, x, y);
+        }
         
         return canvas;
     }
@@ -355,6 +455,23 @@
             </div>`;
     }
 
+    function updateUIState() {
+        const isFullscreen = els.fullscreenWatermark.checked;
+        
+        // 控制位置相关控件的可用性
+        els.positionContainer.classList.toggle('fullscreen-disabled', isFullscreen);
+        els.spacingContainer.classList.toggle('hidden', !isFullscreen);
+        
+        // 更新拖拽提示
+        els.dragHint.textContent = isFullscreen ? '全屏水印模式' : '拖动可调整可见水印位置';
+        
+        // 禁用/启用拖拽功能
+        const overlays = document.querySelectorAll('.drag-overlay');
+        overlays.forEach(overlay => {
+            overlay.style.pointerEvents = isFullscreen ? 'none' : 'auto';
+        });
+    }
+
     function updatePreviews() {
         els.imagePreview.innerHTML = '';
         
@@ -371,6 +488,7 @@
             const overlay = document.createElement('div');
             overlay.className = 'drag-overlay';
             overlay.style.height = 'calc(100% - 40px)';
+            overlay.style.pointerEvents = els.fullscreenWatermark.checked ? 'none' : 'auto';
             
             const buttonContainer = document.createElement('div');
             buttonContainer.className = 'button-container';
@@ -380,12 +498,7 @@
             saveBtn.textContent = '保存';
             saveBtn.onclick = (e) => {
                 e.stopPropagation();
-                const link = document.createElement('a');
-                link.href = canvas.toDataURL('image/png');
-                link.download = `水印图片_${i + 1}.png`;
-                document.body.appendChild(link);
-                link.click();
-                document.body.removeChild(link);
+                downloadSingleImage(canvas, i + 1);
             };
 
             const extractBtn = document.createElement('button');
@@ -407,10 +520,89 @@
         });
     }
 
+    // 下载单个图片
+    function downloadSingleImage(canvas, index) {
+        if (isMobile()) {
+            // 移动端：在新窗口中打开图片
+            const dataUrl = canvas.toDataURL('image/png');
+            const newWindow = window.open();
+            newWindow.document.write(`
+                <html>
+                    <head>
+                        <title>水印图片${index}</title>
+                        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+                        <style>
+                            body { margin: 0; padding: 20px; text-align: center; }
+                            img { max-width: 100%; height: auto; }
+                            .tip { margin: 10px 0; color: #666; font-size: 14px; }
+                        </style>
+                    </head>
+                    <body>
+                        <div class="tip">长按图片选择保存到相册</div>
+                        <img src="${dataUrl}" alt="水印图片${index}">
+                    </body>
+                </html>
+            `);
+        } else {
+            // PC端：直接下载
+            const link = document.createElement('a');
+            link.href = canvas.toDataURL('image/png');
+            link.download = `水印图片_${index}.png`;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        }
+    }
+
+    // 批量下载为ZIP
+    async function downloadAsZip() {
+        if (state.images.length === 0) return;
+        
+        els.downloadProgress.classList.remove('hidden');
+        
+        try {
+            const zip = new JSZip();
+            
+            // 添加图片到ZIP
+            for (let i = 0; i < state.images.length; i++) {
+                const canvas = createWatermarkedCanvas(state.images[i]);
+                const dataUrl = canvas.toDataURL('image/png');
+                const base64Data = dataUrl.split(',')[1];
+                zip.file(`水印图片_${i + 1}.png`, base64Data, { base64: true });
+            }
+            
+            // 生成ZIP文件
+            const content = await zip.generateAsync({ type: 'blob' });
+            
+            // 下载ZIP文件
+            const link = document.createElement('a');
+            link.href = URL.createObjectURL(content);
+            link.download = `水印图片_${new Date().toISOString().slice(0, 10)}.zip`;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            
+            // 清理URL对象
+            URL.revokeObjectURL(link.href);
+            
+        } catch (error) {
+            console.error('ZIP生成失败:', error);
+            alert('ZIP文件生成失败，请重试');
+        } finally {
+            els.downloadProgress.classList.add('hidden');
+        }
+    }
+
     // Event Listeners
     els.imageInput.onchange = async e => {
         state.images = await Promise.all(Array.from(e.target.files).map(loadImage));
         els.previewArea.classList.remove('hidden');
+        updateUIState();
+        updatePreviews();
+    };
+
+    els.fullscreenWatermark.onchange = () => {
+        updateUIState();
         updatePreviews();
     };
 
@@ -421,8 +613,13 @@
         }
     };
 
+    els.spacing.oninput = () => {
+        els.spacingValue.textContent = els.spacing.value;
+        updatePreviews();
+    };
+
     els.imagePreview.onmousedown = e => {
-        if (!e.target.classList.contains('drag-overlay')) return;
+        if (!e.target.classList.contains('drag-overlay') || els.fullscreenWatermark.checked) return;
         e.preventDefault();
         state.isDragging = true;
         state.currentCanvas = e.target.previousElementSibling;
@@ -431,7 +628,7 @@
     };
 
     document.onmousemove = e => {
-        if (!state.isDragging || !state.dragStartPos) return;
+        if (!state.isDragging || !state.dragStartPos || els.fullscreenWatermark.checked) return;
         const rect = state.dragStartPos;
         state.watermarkPos = {
             x: Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width)),
@@ -468,9 +665,14 @@
                 .img-wrap { margin-bottom: 20px; }
                 img { max-width: 100%; height: auto; display: block; margin-bottom: 10px; }
                 p { margin: 5px 0; color: #666; }
+                .tip { background: #f0f0f0; padding: 10px; border-radius: 5px; margin-bottom: 20px; }
             </style>
             </head><body>
-            <h2 style="margin-bottom: 20px;">长按图片即可保存</h2>
+            <div class="tip">
+                <strong>保存说明：</strong><br>
+                • 电脑端：右键图片选择"另存为"<br>
+                • 手机端：长按图片选择"保存到相册"
+            </div>
         `);
         
         state.images.forEach((img, i) => {
@@ -488,18 +690,23 @@
     };
 
     els.saveAll.onclick = () => {
+        if (isMobile()) {
+            // 移动端提示用户使用其他方式
+            alert('手机端建议使用"在新页面中查看"或"打包下载ZIP"功能');
+            return;
+        }
+        
+        // PC端批量下载
         state.images.forEach((img, i) => {
-            const canvas = createWatermarkedCanvas(img);
-            const link = document.createElement('a');
-            link.href = canvas.toDataURL('image/png');
-            link.download = `水印图片_${i + 1}.png`;
-            document.body.appendChild(link);
-            link.click();
-            document.body.removeChild(link);
-            if (i < state.images.length - 1) {
-                setTimeout(() => {}, 100);
-            }
+            setTimeout(() => {
+                downloadSingleImage(createWatermarkedCanvas(img), i + 1);
+            }, i * 200); // 添加延迟避免同时下载太多文件
         });
     };
+
+    els.downloadZip.onclick = downloadAsZip;
+
+    // 初始化UI状态
+    updateUIState();
 })();
 </script>
